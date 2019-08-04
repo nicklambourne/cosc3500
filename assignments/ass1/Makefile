@@ -1,7 +1,7 @@
-all: clean bin/suffix_tree
+all: clean bin/ass1
 
-bin/suffix_tree:
-	g++ -Wall -Werror -std=c++11 suffix_tree.cpp -o ./bin/suffix_tree
+bin/ass1:
+	g++ -Wall -Werror -std=c++11 main.cpp -o ./bin/ass1
 
 .PHONY: clean
 clean:

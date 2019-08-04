@@ -1,6 +1,3 @@
-#include<iostream>
-
-
 class TreeNode {
     private:
         TreeNode* parent;
@@ -25,8 +22,3 @@ class TreeNode {
         }
 
 };
-
-int main(int argc, char** argv) {
-    TreeNode t = TreeNode('c');
-    std::cout << t.getValue();
-}
