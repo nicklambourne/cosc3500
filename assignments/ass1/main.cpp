@@ -1,8 +1,50 @@
-#include<iostream>
+#include<algorithm>
 #include<fstream>
+#include<iostream>
 #include<string>
+#include<vector>
+
 using namespace std;
 
+
+// Reverses a string in place
+void reverse_string(string& x) {
+    reverse(x.begin(), x.end());
+}
+
+// Takes two strings and an LCS table and reconstructs the actual LCS string
+string reconstruct_lcs(vector<vector<int>> table, string x, string y) {
+    string lcs = "";
+    int i = x.length() - 1;
+    int j = y.length() - 1;
+    while (!(i == 0 && j == 0)) {
+        if (x[i] == y[j]) {  // Characters match
+            lcs.append(x, i, 1);
+        }  
+        if (i == 0 && j == 0) {  // No more to parse
+            break;
+        } else if (i == 0) {  // Cannot go any further left
+            j--;
+        } else if (j == 0) {  // Cannot go any futher up
+            i--;
+        } else if (x[i] == y[j]) {  // Symbols are equal, move diagonal
+            i--;
+            j--;            
+        } else if (table[i-1][j] > table[i][j-1]) {  // Up is larger  
+            i--;
+        } else if (table[i-1][j] < table[i][j-1]) {  // Left is larger
+            j--;
+        } else {  // Decrement the larger index
+            if (i > j) {
+                i--;
+            } else {
+                j--;
+            }
+        }
+    }
+    reverse_string(lcs);
+    return lcs;
+}
 
 // Finds the longest common substring between the two provided strings
 string lcs(string x, string y) {
@@ -12,18 +54,18 @@ string lcs(string x, string y) {
         len_x,
         vector<int> (len_y, 0)        
     );
-    for (int i = 0; i <= n; i++) {
-        for (int j = 0; j <= len_y; j++) {
+    for (int i = 0; i < len_x; i++) {
+        for (int j = 0; j < len_y; j++) {
             if (i == 0 || j == 0) {
                 table[i][j] = 0;
             } else if (x[i - 1] == y[j - 1]) {
                 table[i][j] = table[i - 1][j - 1] + 1;
             } else {
-                table[i][j] = max(table[i - 1][j], table[i, j-1]);
+                table[i][j] = max(table[i - 1][j], table[i][j-1]);
             }
         }
     }
-    return "value";
+    return reconstruct_lcs(table, x, y);
 }
 
 
