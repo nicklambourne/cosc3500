@@ -10,6 +10,7 @@ using namespace std;
 #define CELL_LENGTH 3
 
 
+// Left pads a string with spaces to reach CELL_LENGTH
 string normalise_length(string number) {
     string normalised_string = number;
     while (normalised_string.length() < CELL_LENGTH) {
@@ -19,15 +20,25 @@ string normalise_length(string number) {
 }
 
 
-string show_table(vector<vector<int>> table) {
-    string str_table = "   ";
-    for (int i = 0; i < table.size(); i++) {
+// Produces a printable string representation of the given table
+string show_table(vector<vector<int>> table, string x, string y) {
+    x = " " + x;
+    y = " " + y;
+    string str_table = "      ";
+    for (int i = 0; i < (int) table.size(); i++) {
+        str_table += "  ";
+        str_table += y[i];
+    }
+    str_table.append("\n      ");
+    for (int i = 0; i < (int) table.size(); i++) {
         str_table.append(normalise_length(to_string(i)));
     }
     str_table += "\n";
-    for (int i = 0; i < table.size(); i++) {
+    for (int i = 0; i < (int) table.size(); i++) {
+        str_table += "  ";
+        str_table +=  x[i];
         str_table.append(normalise_length(to_string(i)));
-        for (int j = 0; j < table[i].size(); j++) {
+        for (int j = 0; j < (int) table[i].size(); j++) {
             string value = to_string(table[i][j]);
             str_table.append(normalise_length(value));
         }
@@ -35,7 +46,6 @@ string show_table(vector<vector<int>> table) {
     }
     return str_table;
 }
-
 
 // Reverses a string in place
 void reverse_string(string& x) {
@@ -45,11 +55,13 @@ void reverse_string(string& x) {
 // Takes two strings and an LCS table and reconstructs the actual LCS string
 string reconstruct_lcs(vector<vector<int>> table, string x, string y) {
     string lcs = "";
-    int i = x.length() - 1;
-    int j = y.length() - 1;
+    int i = x.length();
+    int j = y.length();
     while (!(i == 0 && j == 0)) {
+        printf("(i: %d, j: %d): %d\n", i, j, table[i][j]);
         if (x[i] == y[j]) {  // Characters match
             lcs.append(x, i, 1);
+            printf("%c\n", x[i]);
         }  
         if (i == 0 && j == 0) {  // No more to parse
             break;
@@ -57,13 +69,13 @@ string reconstruct_lcs(vector<vector<int>> table, string x, string y) {
             j--;
         } else if (j == 0) {  // Cannot go any futher up
             i--;
-        } else if (x[i] == y[j]) {  // Symbols are equal, move diagonal
-            i--;
-            j--;            
         } else if (table[i-1][j] > table[i][j-1]) {  // Up is larger  
             i--;
         } else if (table[i-1][j] < table[i][j-1]) {  // Left is larger
             j--;
+        } else if (table[i-1][j] == table[i][j-1]) {  // Equal, move diagonal
+            i--;
+            j--;            
         } else {  // Decrement the larger index
             if (i > j) {
                 i--;
@@ -80,9 +92,10 @@ string reconstruct_lcs(vector<vector<int>> table, string x, string y) {
 string lcs(string x, string y) {
     int len_x = x.length();
     int len_y = y.length();
+
     vector<vector<int>> table (
-        len_x,
-        vector<int> (len_y, 0)        
+        len_x + 1,
+        vector<int> (len_y + 1, 0)        
     );
     for (int i = 0; i <= len_x; i++) {
         for (int j = 0; j <= len_y; j++) {
@@ -95,7 +108,7 @@ string lcs(string x, string y) {
             }
         }
     }
-    cout << show_table(table);
+    cout << show_table(table, x, y);
     return reconstruct_lcs(table, x, y);
 }
 
