@@ -7,6 +7,36 @@
 using namespace std;
 
 
+#define CELL_LENGTH 3
+
+
+string normalise_length(string number) {
+    string normalised_string = number;
+    while (normalised_string.length() < CELL_LENGTH) {
+        normalised_string = " " + normalised_string;
+    }
+    return normalised_string;
+}
+
+
+string show_table(vector<vector<int>> table) {
+    string str_table = "   ";
+    for (int i = 0; i < table.size(); i++) {
+        str_table.append(normalise_length(to_string(i)));
+    }
+    str_table += "\n";
+    for (int i = 0; i < table.size(); i++) {
+        str_table.append(normalise_length(to_string(i)));
+        for (int j = 0; j < table[i].size(); j++) {
+            string value = to_string(table[i][j]);
+            str_table.append(normalise_length(value));
+        }
+        str_table.append("\n");
+    }
+    return str_table;
+}
+
+
 // Reverses a string in place
 void reverse_string(string& x) {
     reverse(x.begin(), x.end());
@@ -46,7 +76,7 @@ string reconstruct_lcs(vector<vector<int>> table, string x, string y) {
     return lcs;
 }
 
-// Finds the longest common substring between the two provided strings
+// Finds the longest common subsequence between the two provided strings
 string lcs(string x, string y) {
     int len_x = x.length();
     int len_y = y.length();
@@ -54,17 +84,18 @@ string lcs(string x, string y) {
         len_x,
         vector<int> (len_y, 0)        
     );
-    for (int i = 0; i < len_x; i++) {
-        for (int j = 0; j < len_y; j++) {
+    for (int i = 0; i <= len_x; i++) {
+        for (int j = 0; j <= len_y; j++) {
             if (i == 0 || j == 0) {
                 table[i][j] = 0;
             } else if (x[i - 1] == y[j - 1]) {
                 table[i][j] = table[i - 1][j - 1] + 1;
             } else {
-                table[i][j] = max(table[i - 1][j], table[i][j-1]);
+                table[i][j] = max(table[i - 1][j], table[i][j - 1]);
             }
         }
     }
+    cout << show_table(table);
     return reconstruct_lcs(table, x, y);
 }
 
@@ -92,8 +123,6 @@ int main(int argc, char** argv) {
             cerr << "Error reading from provided file." << endl;
             exit(3);
         }
-        // cout << string_x << endl;
-        // cout << string_y << endl;
     } else {
         cerr << "Could not open provided file." << endl;
         exit(2);
