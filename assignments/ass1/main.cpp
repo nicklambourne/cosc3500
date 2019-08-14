@@ -9,6 +9,9 @@ using namespace std;
 
 #define CELL_LENGTH 3
 
+string recusive_reconstruct(vector<vector<int>> table, string x, string y, 
+        int i, int j);
+
 
 // Left pads a string with spaces to reach CELL_LENGTH
 string normalise_length(string number) {
@@ -52,16 +55,36 @@ void reverse_string(string& x) {
     reverse(x.begin(), x.end());
 }
 
+string recursive_reconstruct(vector<vector<int>> table, string x, string y, 
+        int i, int j) {
+    printf("(i: %d, j: %d): %d\n", i, j, table[i-1][j-1]);
+    if (i == 0 || j == 0) {
+        return "";
+    }
+    if (x[i] == y[j]) {
+        printf("%c\n", x[i]);
+        return recursive_reconstruct(table, x, y, i - 1, j - 1) + x[i];
+    }
+    if (table[i][j - 1] > table[i - 1][j]) {
+        return recursive_reconstruct(table, x, y, i, j - 1);
+    }
+    return recursive_reconstruct(table, x, y, i - 1, j);
+}
+
 // Takes two strings and an LCS table and reconstructs the actual LCS string
 string reconstruct_lcs(vector<vector<int>> table, string x, string y) {
     string lcs = "";
-    int i = x.length();
-    int j = y.length();
-    while (!(i == 0 && j == 0)) {
-        printf("(i: %d, j: %d): %d\n", i, j, table[i][j]);
+    int i = x.length() - 1;
+    int j = y.length() - 1;
+    while (!(i <= 0 && j <= 0)) {
+        printf("(i: %d, j: %d): %d\n", i + 1, j + 1, table[i][j]);
         if (x[i] == y[j]) {  // Characters match
+            printf("diagonal: %c, %c\n", x[i], y[j]);
             lcs.append(x, i, 1);
-            printf("%c\n", x[i]);
+            printf("%c\n", x[i - 1]);
+            i = max(i - 1, 0);
+            j = max(j - 1, 0);
+            continue;
         }  
         if (i == 0 && j == 0) {  // No more to parse
             break;
@@ -73,15 +96,8 @@ string reconstruct_lcs(vector<vector<int>> table, string x, string y) {
             i--;
         } else if (table[i-1][j] < table[i][j-1]) {  // Left is larger
             j--;
-        } else if (table[i-1][j] == table[i][j-1]) {  // Equal, move diagonal
+        } else { 
             i--;
-            j--;            
-        } else {  // Decrement the larger index
-            if (i > j) {
-                i--;
-            } else {
-                j--;
-            }
         }
     }
     reverse_string(lcs);
@@ -110,6 +126,7 @@ string lcs(string x, string y) {
     }
     cout << show_table(table, x, y);
     return reconstruct_lcs(table, x, y);
+    //return recursive_reconstruct(table, x, y, x.length(), y.length());
 }
 
 
