@@ -12,7 +12,7 @@ from datetime import datetime
 from matplotlib import pyplot
 
 
-BINARY_PATH = "./bin/lcs-serial"
+BINARY_PATH = "./bin/lcs"
 TEST_PATH = "./auto_test"
 
 

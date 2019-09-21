@@ -1,10 +1,14 @@
+CC = g++
+CFLAGS = -g -Wall -Werror -std=c++11
+
 all: clean serial omp
 
 serial:
-	g++ -g -Wall -Werror -std=c++11 lcs-serial.cc -o ./bin/lcs-serial
+	${CC} ${CFLAGS} lcs-serial.cc -o ./bin/lcs-serial
 
 omp:
-	g++ −g −Wall -Werror -std=c++11 lcs-p-omp.cc −fopenmp −o ./bin/lcs-omp
+	${CC} ${CFLAGS} lcs-omp.cc -fopenmp -o ./bin/lcs-omp 
+
 
 .PHONY: clean
 clean:

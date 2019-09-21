@@ -83,25 +83,26 @@ string reconstruct_lcs(vector<vector<int>> table, string x, string y) {
 
 // Finds the longest common subsequence between the two provided strings
 string lcs(string x, string y) {
-    int len_x = x.length();
-    int len_y = y.length();
+    int m = x.length();
+    int n = y.length();
 
-    if (len_x == 0 || len_y == 0) {
+    if (m == 0 || n == 0) {
         return "";
     }
 
     vector<vector<int>> table (
-        len_x + 1,
-        vector<int> (len_y + 1, 0)        
+        m,
+        vector<int> (n, 0)        
     );
 
-    #pragma omp parallel
+    int i, j, diag;
+    #pragma omp parallel default(none) shared(x, y, table, m, n) private(i, j, diag) 
     #pragma omp for
-    for (int i = 0; i <= len_x; i++) {
-        for (int j = 0; j <= len_y; j++) {
-            if (i == 0 || j == 0) {
-                table[i][j] = 0;
-            } else if (x[i - 1] == y[j - 1]) {
+    for (diag = 2; diag < m + n; diag++) {
+        #pragma omp parallel for
+        for (i = min(m, diag - 1); i < max(1, diag - 1); i++) {
+            j = diag - 1;
+            if (x[i - 1] == y[i - 1]) {
                 table[i][j] = table[i - 1][j - 1] + 1;
             } else {
                 table[i][j] = max(table[i - 1][j], table[i][j - 1]);
