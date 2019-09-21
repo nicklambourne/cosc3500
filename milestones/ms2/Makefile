@@ -4,7 +4,7 @@ serial:
 	g++ -g -Wall -Werror -std=c++11 lcs-serial.cc -o ./bin/lcs-serial
 
 omp:
-	g++ −g −Wall -Werror -std=c++11 lcs-omp.cc −fopenmp −o ./bin/lcs-omp
+	g++ −g −Wall -Werror -std=c++11 lcs-p-omp.cc −fopenmp −o ./bin/lcs-omp
 
 .PHONY: clean
 clean:
