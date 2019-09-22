@@ -96,13 +96,19 @@ string lcs(string x, string y) {
     );
 
     int i, j, diag;
-    #pragma omp parallel default(none) shared(x, y, table, m, n) private(i, j, diag) 
-    #pragma omp for
+    //#pragma omp parallel default(none) shared(x, y, table, m, n) private(i, j, diag) 
+    //#pragma omp for
     for (diag = 2; diag < m + n; diag++) {
-        #pragma omp parallel for
+        //#pragma omp parallel for
+        cout << "?" << endl; 
         for (i = min(m, diag - 1); i < max(1, diag - 1); i++) {
             j = diag - 1;
-            if (x[i - 1] == y[i - 1]) {
+            
+            if (j > n - 1) {
+                continue;
+            }
+            cout << show_table(table, x, y) << endl;
+            if (x[i - 1] == y[j - 1]) {
                 table[i][j] = table[i - 1][j - 1] + 1;
             } else {
                 table[i][j] = max(table[i - 1][j], table[i][j - 1]);
