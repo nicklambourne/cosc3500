@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <fstream>
 #include <vector>
+#include <math.h>
 
 
 using namespace std;
@@ -13,7 +14,6 @@ vector<vector<int>> construct_table(int height, int width) {
     );
     return table;
 }
-
 
 // Left pads a string with spaces to reach CELL_LENGTH
 string pad(string contents, int length) {
@@ -128,11 +128,72 @@ void process_block(vector<vector<int>> table, vector<int> top, vector<int> left,
 vector<string> get_substrings(string str, int size) {
     vector<string> substrings;
     for (int i = 0; i < (int) str.length(); i += size) {
-        int limit = min(str.length() - i, size);
+        int limit = min((int) str.length() - i, size);
         substrings.push_back(str.substr(i, limit));
     }
     return substrings;
 }
+
+vector<int> get_mpi_dimensions(int num_procs, string a, string b) {
+     // Height, Width
+    vector<int> dims = {1, 1};
+    if (num_procs < 3) {
+        return dims;
+    }
+    
+    int root = 1;
+    int num_workers = num_procs - root;
+
+    if (!(a.length() == 1)) {
+        dims[0] = num_workers;
+    }
+
+    if (!(b.length() == 1)) {
+        dims[1] = num_workers;
+    }
+
+    return dims;
+}
+
+typedef struct {
+    int id;
+    int start_x;
+    int start_y;
+    int end_x;
+    int end_y;
+} SectionInfo;
+
+vector<vector<SectionInfo>> produce_sections(string a, string b, vector<int> mpi_dims) {
+    int cell_width = mpi_dims[1];
+    int cell_height = mpi_dims[0];
+    int total_width = a.length();
+    int total_height = b.length();
+    int norm_width = ceil(total_width / (float) cell_width);
+    int norm_height = ceil(total_height / (float) cell_height);
+    cout << norm_height << endl;
+    vector<vector<SectionInfo>> sections;
+    for (int i = 0; i < cell_width + cell_height - 1; i++) {
+        int start_x = get_x(i, cell_height);
+        int start_y = get_y(i, cell_height);
+        int limit_x = end_x(start_x, start_y, cell_width - 1);
+        vector<SectionInfo> diagonal;
+        for (int x = start_x, y = start_y; x <= limit_x; x++, y--) {
+            SectionInfo info;
+            info.id = i;
+            info.start_x = max(0, x * norm_width);
+            info.start_y = max(0, y * norm_height);
+            info.end_x = min((x + 1) * norm_width - 1, total_width - 1);
+            info.end_y = min((y + 1) * norm_height - 1, total_height - 1);
+            cout << "[x:" << x << ", y:" << y << "]" << endl;
+            cout << "(sx: " << info.start_x << ", ex: " << info.end_x << 
+                        " - sy: " << info.start_y << ", ey: " << info.end_y <<
+                ")" << endl;
+            diagonal.push_back(info);
+        }
+        sections.push_back(diagonal);
+    }
+    return sections;
+} 
 
 void lcs_parallel(string a, string b) {
     // vector<vector<int>> table = construct_table(a.length(), b.length());
@@ -140,22 +201,21 @@ void lcs_parallel(string a, string b) {
     // vector<int> left (b.length(), 0);
 
     //diagonal_lcs(table, a, b, top, left);
-    vector<string> substrings = get_substrings(a, 3);
-    for (int i = 0; i < (int) substrings.size(); i++) {
-        cout << substrings[i] << endl;
-    }
-}
+    MPI_Init(NULL, NULL);
 
-vector<int> get_mpi_dimensions(int num_procs) {
-    if (num_procs < 3) {
-        return vector<int>{1, 1};
-    }
+    int num_procs;
+    MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
+    num_procs = 3;
+    vector<int> dims = get_mpi_dimensions(num_procs, a, b);
+
+    MPI_Comm_rank(MPI_COMM_WORLD, &my_mpi_rank);
     
-    int root = 1;
-
-    int num_workers = num_procs - root;
-
-    return vector<int>{num_workers, num_workers};
+    // Root Process
+    if (my_mpi_rank == 0) {
+        vector<vector<SectionInfo>> sections = produce_sections(a, b, dims);
+    } else {
+        // Worker processes
+    }
 
 }
 
