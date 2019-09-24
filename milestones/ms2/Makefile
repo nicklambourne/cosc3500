@@ -1,6 +1,6 @@
 CC = g++
 MPICC = mpic++
-CFLAGS = -g -Wall -std=c++11
+CFLAGS = -g -Wall -Werror -std=c++11
 
 all: clean serial omp mpi
 

@@ -6,6 +6,14 @@
 
 using namespace std;
 
+vector<vector<int>> construct_table(int height, int width) {
+    vector<vector<int>> table (
+        height,
+        vector<int> (width, 0)        
+    );
+    return table;
+}
+
 
 // Left pads a string with spaces to reach CELL_LENGTH
 string pad(string contents, int length) {
@@ -51,19 +59,29 @@ int get_y(int index, int height) {
     }
 }
 
+int get_top_left(vector<vector<int>> table, int x, int y, vector<int> top, vector<int> left) {
+    if (y == 0) {
+        return top[x];
+    }
+    if (x == 0) {
+        return left[y-1];
+    }
+    return table[y - 1][x - 1];
+}
+
 int calculate_cell(vector<vector<int>> table, int x, int y,
-                   string a, string b) {
-    int left = x > 0 && y >= 0 ? table[y][x - 1] : 0;
-    int top = x >= 0 && y > 0 ? table[y - 1][x] : 0;
-    int top_left = x > 0 && y > 0 ? table[y - 1][x - 1] : 0;
+                   string a, string b, vector<int> top, vector<int> left) {
+    int left_cell = x > 0 && y >= 0 ? table[y][x - 1] : left[y];
+    int top_cell = x >= 0 && y > 0 ? table[y - 1][x] : top[x+1];
+    int top_left = get_top_left(table, x, y, top, left);
     if (x >= 0 && y >= 0 && a[y] == b[x]) {
         return top_left + 1;
     } else {
-        return max(top, left);
+        return max(top_cell, left_cell);
     }
 }
 
-void diagonal_lcs(vector<vector<int>> table, string a, string b) {
+void diagonal_lcs(vector<vector<int>> table, string a, string b, vector<int> top, vector<int> left) {
     int height = a.length();
     int width = b.length();
     vector<vector<vector<int>>> indices;
@@ -80,12 +98,12 @@ void diagonal_lcs(vector<vector<int>> table, string a, string b) {
     
     for (int i = 0; i < (int) indices.size(); i++) {
         vector<vector<int>> diagonal = indices[i];
-        #pragma omp parallel for shared(table, diagonal, a, b)
+        #pragma omp parallel for shared(table, diagonal, a, b, top, left)
         for (int j = 0; j < (int) diagonal.size(); j++) {
             vector<int> cell = diagonal[j];
             int x = cell[0];
             int y = cell[1];
-            int result = calculate_cell(table, x, y, a, b);
+            int result = calculate_cell(table, x, y, a, b, top, left);
             table[y][x] = result;
         }
     }
@@ -93,14 +111,52 @@ void diagonal_lcs(vector<vector<int>> table, string a, string b) {
     print_table(table, a, b);
 }
 
-vector<vector<int>> construct_table(string a, string b) {
-    int height = a.length();
-    int width = b.length();
-    vector<vector<int>> table (
-        height,
-        vector<int> (width, 0)        
-    );
-    return table;
+vector<int> extract_solution(vector<vector<int>> table) {
+    vector<int> single_dim;
+    for (int y = 0; y < (int) table.size(); y++) {
+        for (int x = 0; x < (int) table[y].size(); x++) {
+            single_dim.push_back(table[y][x]);
+        }
+    }
+    return single_dim;
+}
+
+void process_block(vector<vector<int>> table, vector<int> top, vector<int> left, string a, string b) {
+    cout << "x" << endl; 
+}
+
+vector<string> get_substrings(string str, int size) {
+    vector<string> substrings;
+    for (int i = 0; i < (int) str.length(); i += size) {
+        int limit = min(str.length() - i, size);
+        substrings.push_back(str.substr(i, limit));
+    }
+    return substrings;
+}
+
+void lcs_parallel(string a, string b) {
+    // vector<vector<int>> table = construct_table(a.length(), b.length());
+    // vector<int> top (a.length() + 1, 0);
+    // vector<int> left (b.length(), 0);
+
+    //diagonal_lcs(table, a, b, top, left);
+    vector<string> substrings = get_substrings(a, 3);
+    for (int i = 0; i < (int) substrings.size(); i++) {
+        cout << substrings[i] << endl;
+    }
+}
+
+vector<int> get_mpi_dimensions(int num_procs) {
+    if (num_procs < 3) {
+        return vector<int>{1, 1};
+    }
+    
+    int root = 1;
+
+    int num_workers = num_procs - root;
+
+    return vector<int>{num_workers, num_workers};
+
 }
 
 void gather_strings(string file_name, string* x, string* y) {
@@ -139,11 +195,6 @@ int main(int argc, char** argv) {
 
     gather_strings(file_name, &string_a, &string_b);
 
-    cout << string_a << endl;
-    cout << string_b << endl;
-
-    vector<vector<int>> table = construct_table(string_a, string_b);
-
-    diagonal_lcs(table, string_a, string_b);
+    lcs_parallel(string_a, string_b);
 
 }
