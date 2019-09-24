@@ -66,22 +66,30 @@ int calculate_cell(vector<vector<int>> table, int x, int y,
 void diagonal_lcs(vector<vector<int>> table, string a, string b) {
     int height = a.length();
     int width = b.length();
+    vector<vector<vector<int>>> indices;
     for (int i = 0; i < height + width - 1; i++) {
-        int current_x = get_x(i, height);
-        int current_y = get_y(i, height);
-        int end = end_x(current_x, current_y, width - 1);
-        cout << "start position - x: "  << current_x << ", y: " << current_y << endl;
-        cout << "end_x: " << end << endl;
-        print_table(table, a, b);
-        
-        for (; current_x <= end;) {
-            int result = calculate_cell(table, current_x, current_y, a, b);
-            cout << "(x: "  << current_x << ", y: " << current_y << ", result: " << result << ")"  << endl;
-            table[current_y][current_x] = result;
-            current_x++;
-            current_y--;
+        int start_x = get_x(i, height);
+        int start_y = get_y(i, height);
+        int limit_x = end_x(start_x, start_y, width - 1);
+        vector<vector<int>> diagonal;
+        for (int x = start_x, y = start_y; x <= limit_x; x++, y--) {
+            diagonal.push_back(vector<int>{x, y});
+        }
+        indices.push_back(diagonal);
+    }
+    
+    for (int i = 0; i < (int) indices.size(); i++) {
+        vector<vector<int>> diagonal = indices[i];
+        #pragma omp parallel for shared(table, diagonal, a, b)
+        for (int j = 0; j < (int) diagonal.size(); j++) {
+            vector<int> cell = diagonal[j];
+            int x = cell[0];
+            int y = cell[1];
+            int result = calculate_cell(table, x, y, a, b);
+            table[y][x] = result;
         }
     }
+
     print_table(table, a, b);
 }
 
