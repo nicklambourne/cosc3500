@@ -2,6 +2,9 @@
 #include <stdio.h>
 #include <fstream>
 #include <vector>
+#include<string>
+#include<iostream> 
+#include<algorithm> 
 #include <math.h>
 
 using namespace std;
@@ -33,13 +36,17 @@ string pad(string contents, int length) {
 }
 
 void print_table(vector<vector<int>> table, string a, string b) {
-    cout << " ";
+    cout << "     ";
+    for (int i = 0; i < (int) b.length(); i++) {
+        cout << pad(to_string(i), 3);
+    }
+    cout << endl << "     ";
     for (int i = 0; i < (int) b.length(); i++) {
         cout << pad(b.substr(i, 1), 3);
     }
     cout << endl;
     for (int y = 0; y < (int) table.size(); y++) {
-        cout << a.substr(y, 1);
+        cout << pad(to_string(y), 3) << " " << a.substr(y, 1);
         for (int x = 0; x < (int) table[y].size(); x++) {
             cout << pad(to_string(table[y][x]), 3);
         }
@@ -89,7 +96,7 @@ int calculate_cell(vector<vector<int>> table, int x, int y,
     }
 }
 
-void diagonal_lcs(vector<vector<int>> table, string a, string b, int* top, int* left) {
+vector<vector<int>> diagonal_lcs(vector<vector<int>> table, string a, string b, int* top, int* left) {
     int height = a.length();
     int width = b.length();
     vector<vector<vector<int>>> indices;
@@ -116,7 +123,8 @@ void diagonal_lcs(vector<vector<int>> table, string a, string b, int* top, int* 
         }
     }
 
-    print_table(table, a, b);
+    //print_table(table, a, b);
+    return table;
 }
 
 int* get_top(vector<vector<int>> table, SectionInfo info) {
@@ -150,17 +158,15 @@ int* get_left(vector<vector<int>> table, SectionInfo info) {
 }
 
 int* extract_solution(vector<vector<int>> table) {
-    vector<int> single_dim = malloc(sizeof(int) * (table.size() * table[0].size()));
+    int size = (table.size() * table[0].size());
+    int* single_dim = (int*) malloc(sizeof(int) * size);
+    int index = 0;
     for (int y = 0; y < (int) table.size(); y++) {
-        for (int x = 0; x < (int) table[y].size(); x++) {
-            single_dim.push_back(table[y][x]);
+        for (int x = 0; x < (int) table[y].size(); x++, index++) {
+            single_dim[index] = table[y][x];
         }
     }
     return single_dim;
-}
-
-void process_block(vector<vector<int>> table, vector<int> top, vector<int> left, string a, string b) {
-    cout << "x" << endl; 
 }
 
 vector<string> get_substrings(string str, int size) {
@@ -196,11 +202,10 @@ vector<int> get_mpi_dimensions(int num_procs, string a, string b) {
 vector<vector<SectionInfo>> produce_sections(string a, string b, vector<int> mpi_dims) {
     int cell_width = mpi_dims[1];
     int cell_height = mpi_dims[0];
-    int total_width = a.length();
-    int total_height = b.length();
+    int total_width = b.length();
+    int total_height = a.length();
     int norm_width = ceil(total_width / (float) cell_width);
     int norm_height = ceil(total_height / (float) cell_height);
-    cout << norm_height << endl;
     vector<vector<SectionInfo>> sections;
     for (int i = 0; i < cell_width + cell_height - 1; i++) {
         int start_x = get_x(i, cell_height);
@@ -214,10 +219,10 @@ vector<vector<SectionInfo>> produce_sections(string a, string b, vector<int> mpi
             info.start_y = max(0, y * norm_height);
             info.end_x = min((x + 1) * norm_width - 1, total_width - 1);
             info.end_y = min((y + 1) * norm_height - 1, total_height - 1);
-            cout << "[x:" << x << ", y:" << y << ", r:" << info.rank << "]" << endl;
-            cout << "(sx: " << info.start_x << ", ex: " << info.end_x << 
-                        " - sy: " << info.start_y << ", ey: " << info.end_y <<
-                ")" << endl;
+            // cout << "[x:" << x << ", y:" << y << ", r:" << info.rank << "]" << endl;
+            // cout << "(sx: " << info.start_x << ", ex: " << info.end_x << 
+            //             " - sy: " << info.start_y << ", ey: " << info.end_y <<
+            //     ")" << endl;
             diagonal.push_back(info);
         }
         sections.push_back(diagonal);
@@ -225,50 +230,77 @@ vector<vector<SectionInfo>> produce_sections(string a, string b, vector<int> mpi
     return sections;
 } 
 
-void repopulate(vector<vector<int>> table, SectionInfo info, int* contents) {
-    int index = 0;
-    for (int y = info.start_y; y <= info.end_y; y++) {
-        for (int x = info.start_x; x < info.end_x; x++, index++) {
-            table[y][x] = contents[index];
-        }
-    }
-}
-
 // Reverses a string in place
 void reverse_string(string& x) {
     reverse(x.begin(), x.end());
 }
 
 // Takes two strings and an LCS table and reconstructs the actual LCS string
-string reconstruct_lcs(vector<vector<int>> table, string x, string y) {
+string reconstruct_lcs(vector<vector<int>> table, string a, string b) {
     string lcs = "";
-    int i = x.length() - 1;
-    int j = y.length() - 1;
-    while (i != 0 && j != 0) {
-        if (x[i] == y[j]) {  // Characters match
-            lcs.append(x, i, 1);
-            i = max(i - 1, 0);
-            j = max(j - 1, 0);
-        } else if (i == 0) {  // Cannot go any further left
-            j--;
-        } else if (j == 0) {  // Cannot go any further up
-            i--;
-        } else if (table[i][j-1] > table[i-1][j]) {  // Left is larger  
-            j--;
+    int y = a.length() - 1;
+    int x = b.length() - 1;
+    // print_table(table, a, b);
+    while (x >= 0 && y >= 0) {
+        if (a[y] == b[x]) {  // Characters match
+            lcs.append(a, y, 1);
+            y = max(y - 1, -1);
+            x = max(x - 1, -1);
+        } else if (y == 0) {  // Cannot go any further left
+            x--;
+        } else if (x == 0) {  // Cannot go any further up
+            y--;
+        } else if (table[y][x - 1] > table[y - 1][x]) {  // Left is larger 
+            x--;
         } else { // Up is larger or they are the same
-            i--;
+            y--;
         }
     }
     reverse_string(lcs);
     return lcs;
 }
 
-void lcs_parallel(string a, string b) {
+vector<vector<int>> repopulate(vector<vector<int>> table, SectionInfo info, int* contents, string a, string b) {
+    int index = 0;
+    for (int y = info.start_y; y <= info.end_y; y++) {
+        for (int x = info.start_x; x <= info.end_x; x++, index++) {
+            table.at(y).at(x) = contents[index];
+        }
+    }
+    // print_table(table, a, b);
+    return table;
+}
+
+vector<vector<int>> process_section(vector<vector<int>> table, SectionInfo info, string a, string b) {
+    int top_size = (info.end_x - info.start_x + 2);
+    int left_size = (info.end_y - info.start_y + 1);
+    int end_a = left_size;
+    int end_b = top_size - 1;
+    string a_sub = a.substr(info.start_y, end_a);
+    string b_sub = b.substr(info.start_x, end_b);
+    int* top = get_top(table, info);
+    int* left = get_left(table, info);
+    vector<vector<int>> table_sub = construct_table(a_sub.length(), b_sub.length());
+
+    int* result = extract_solution(diagonal_lcs(table_sub, a_sub, b_sub, top, left));
+
+
+
+    table = repopulate(table, info, result, a, b);
+
+    // print_table(table, a, b);
+    return table;
+}
+
+string lcs_parallel(string a, string b, string outfile) {
+    if (a.length() == 0 || b.length() == 0) {
+        return "";
+    }
+    
     MPI_Init(NULL, NULL);
 
     int num_procs;
     MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
-    num_procs = 3;
     vector<int> dims = get_mpi_dimensions(num_procs, a, b);
     int my_mpi_rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &my_mpi_rank);
@@ -278,38 +310,41 @@ void lcs_parallel(string a, string b) {
     if (my_mpi_rank == 0) {
         vector<vector<SectionInfo>> sections = produce_sections(a, b, dims);
         // Process first section
+        table = process_section(table, sections[0][0], a, b);
 
         for (int diagonal = 1; diagonal < (int) sections.size() - 1; diagonal++) {
             for (int index = 0, rank = 1; index < (int) sections[diagonal].size() - 1; index++, rank++) {
                 // Send top
                 SectionInfo section = sections[diagonal][index];
-                int* top = get_top(table, section);
+                
                 int section_data[4] = {section.start_x, section.end_x, section.start_y, section.end_y};
                     // Send info
                 MPI_Send(
-                    *section_data,
+                    &section_data,
                     4,
                     MPI_INT,
                     rank,
                     0, // Tag
                     MPI_COMM_WORLD);
-                
-                    // Send top data
+
+                // Send top data
+                int* top = get_top(table, section);
+                int top_size = (section.end_x - section.start_x + 2);
                 MPI_Send(
                     top,
-                    size,
+                    top_size,
                     MPI_INT,
                     rank,
                     0, // Tag
                     MPI_COMM_WORLD);
 
                 // Send left
-                int* left = get_left(table, SectionInfo);
-
-                    // Send left data
+                int* left = get_left(table, section);
+                int left_size = (section.end_y - section.start_y + 1);
+                // Send left data
                 MPI_Send(
                     left,
-                    size,
+                    left_size,
                     MPI_INT,
                     rank,
                     0, // Tag
@@ -319,85 +354,94 @@ void lcs_parallel(string a, string b) {
             for (int index = 0, rank = 1; index < (int) sections[diagonal].size() - 1; index++, rank++) {
                 // Receive 
                 SectionInfo section = sections[diagonal][index];
-                int* section_content = malloc(sizeof(int) * size)
+                int section_size = (section.end_x - section.start_x + 1) * (section.end_y - section.start_y + 1);
+                int* section_content = (int*) malloc(sizeof(int) * section_size);
                 MPI_Recv(
                     section_content,
-                    size,
+                    section_size,
                     MPI_INT,
                     rank,
                     0,
                     MPI_COMM_WORLD,
                     MPI_STATUS_IGNORE);
                 // Populate table
-                repopulate(table, section, section_content);
+                repopulate(table, section, section_content, a, b);
             }
         }
         // Process last section
-        SectionInfo last = sections[sections.size() - 1][0];
-
+        if (sections.size() > 1) {
+            SectionInfo last = sections[sections.size() - 1][0];
+            table = process_section(table, last, a, b);
+        }
+        
         // Backtrace
-
-        // Write out
+        string lcs = reconstruct_lcs(table, a, b);
 
         // Finalise
         MPI_Finalize();
-        exit(0);
+        
+        return lcs;
     } else {
     // Worker processes
         // Receive Section Info
-        int section[4];
-        MPI_Recv(
-            *section,
-            4,
-            MPI_INT,
-            0,
-            0,
-            MPI_COMM_WORLD,
-            MPI_STATUS_IGNORE);
-
-        int start_x = section[0];
-        int end_x = section[1];
-        int start_y = section[2];
-        int end_y = section[3];
-
-        int top_size = (end_x - start_x + 2);
-        int left_size = (end_y - start_y + 1);
-
-        // Receive Top Data
-        int* top = malloc(sizeof(int) * top_size);
-        MPI_Recv(
-            top,
-            top_size,
-            MPI_INT,
-            0,
-            0,
-            MPI_COMM_WORLD,
-            MPI_STATUS_IGNORE);
-
-        // Receive Left Data
-        int* left = malloc(sizeof(int) * left_size);
-        MPI_Recv(
-            left,
-            left_size,
-            MPI_INT,
-            0,
-            0,
-            MPI_COMM_WORLD,
-            MPI_STATUS_IGNORE);
-
-        string a_sub = a.substr(start_y, left_size);
-        string b_sub = b.substr(start_x, top_size - 1);
-        vector<vector<int>> table_sub = construct_table(a_sub.length(), b_sub.lenth());
-
-        int* result = diagonal_lcs(table, a_sub, b_sub, top, left);
-
-       // Pass back to root
-       MPI_Send(result,
-                (int) (a.length() * b.length()),
+        while (1) {
+            int section[4];
+            MPI_Recv(
+                &section,
+                4,
                 MPI_INT,
-                rank,
+                0,
+                0,
+                MPI_COMM_WORLD,
+                MPI_STATUS_IGNORE);
+
+            int start_x = section[0];
+            int end_x = section[1];
+            int start_y = section[2];
+            int end_y = section[3];
+
+            int top_size = (end_x - start_x + 2);
+            int left_size = (end_y - start_y + 1);
+
+            // Receive Top Data
+            int* top = (int*) malloc(sizeof(int) * top_size);
+            MPI_Recv(
+                top,
+                top_size,
+                MPI_INT,
+                0,
+                0,
+                MPI_COMM_WORLD,
+                MPI_STATUS_IGNORE);
+
+            // Receive Left Data
+            int* left = (int*) malloc(sizeof(int) * left_size);
+            MPI_Recv(
+                left,
+                left_size,
+                MPI_INT,
+                0,
+                0,
+                MPI_COMM_WORLD,
+                MPI_STATUS_IGNORE);
+
+            string a_sub = a.substr(start_y, left_size);
+            string b_sub = b.substr(start_x, top_size - 1);
+            vector<vector<int>> table_sub = construct_table(a_sub.length(), b_sub.length());
+
+            int* result = extract_solution(diagonal_lcs(table, a_sub, b_sub, top, left));
+            int size = (int) (a.length() * b.length());
+
+            // Pass back to root
+            MPI_Send(
+                result,
+                size,
+                MPI_INT,
+                0, // Destination
                 0, // Tag
                 MPI_COMM_WORLD);
+        }
+        
     }
 
 }
@@ -438,6 +482,17 @@ int main(int argc, char** argv) {
 
     gather_strings(file_name, &string_a, &string_b);
 
-    lcs_parallel(string_a, string_b);
+    string lcs = lcs_parallel(string_a, string_b, output_file_name);
+    
+    cout << lcs << endl;
 
+    ofstream output_file;
+    output_file.open(output_file_name);
+
+    if (output_file.is_open()) {
+        output_file << lcs;
+    } else {
+        cerr << "Could not write to given output file." << endl;
+        exit(4);
+    }
 }
