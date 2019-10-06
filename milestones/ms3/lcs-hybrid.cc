@@ -12,6 +12,7 @@ using namespace std;
 // Information pertaining to the dimensions and location of a subsection.
 typedef struct {
     int rank;
+    int index;
     int start_x;
     int start_y;
     int end_x;
@@ -54,7 +55,7 @@ string pad(string contents, int length) {
  * @param a - the string represented on the vertical axis
  * @param b - the string represented on the horizontal axis
  */
-void print_table(vector<vector<int>> table, string a, string b) {
+void print_table(vector<vector<int>> &table, string a, string b) {
     cout << "     ";
     for (int i = 0; i < (int) b.length(); i++) {
         cout << pad(to_string(i), 3);
@@ -93,7 +94,7 @@ int get_y(int index, int height) {
     }
 }
 
-int get_top_left(vector<vector<int>> table, int x, int y, int* top, int* left) {
+int get_top_left(vector<vector<int>> &table, int x, int y, int* top, int* left) {
     if (y == 0) {
         return top[x];
     }
@@ -103,7 +104,7 @@ int get_top_left(vector<vector<int>> table, int x, int y, int* top, int* left) {
     return table[y - 1][x - 1];
 }
 
-int calculate_cell(vector<vector<int>> table, int x, int y,
+int calculate_cell(vector<vector<int>> &table, int x, int y,
                    string a, string b, int* top, int* left) {
     int left_cell = x > 0 && y >= 0 ? table[y][x - 1] : left[y];
     int top_cell = x >= 0 && y > 0 ? table[y - 1][x] : top[x+1];
@@ -115,7 +116,7 @@ int calculate_cell(vector<vector<int>> table, int x, int y,
     }
 }
 
-vector<vector<int>> diagonal_lcs(vector<vector<int>> table, string a, string b, int* top, int* left) {
+void diagonal_lcs(vector<vector<int>> &table, string a, string b, int* top, int* left) {
     int height = a.length();
     int width = b.length();
     vector<vector<vector<int>>> indices;
@@ -141,12 +142,9 @@ vector<vector<int>> diagonal_lcs(vector<vector<int>> table, string a, string b, 
             table[y][x] = result;
         }
     }
-
-    //print_table(table, a, b);
-    return table;
 }
 
-int* get_top(vector<vector<int>> table, SectionInfo info) {
+int* get_top(vector<vector<int>> &table, SectionInfo info) {
     int top_size = info.end_x - info.start_x + 2;
     int* top = (int*) calloc(top_size, sizeof(int));
 
@@ -157,15 +155,15 @@ int* get_top(vector<vector<int>> table, SectionInfo info) {
     }
 
     if (!(info.start_y == 0)) {
-        for (int i = 1; i < top_size; i++) {
-            top[i] = table[info.start_y - 1][info.start_x + i];
+        for (int i = 1, x_index = 0; i < top_size; i++, x_index++) {
+            top[i] = table[info.start_y - 1][info.start_x + x_index];
         }
     }
 
     return top;
 }
 
-int* get_left(vector<vector<int>> table, SectionInfo info) {
+int* get_left(vector<vector<int>> &table, SectionInfo info) {
     int left_size = info.end_y - info.start_y + 1;
     int* left = (int*) calloc(left_size, sizeof(int));
     if (!(info.start_x == 0)) {
@@ -176,7 +174,7 @@ int* get_left(vector<vector<int>> table, SectionInfo info) {
     return left;
 }
 
-int* extract_solution(vector<vector<int>> table) {
+int* extract_solution(vector<vector<int>> &table) {
     int size = (table.size() * table[0].size());
     int* single_dim = (int*) malloc(sizeof(int) * size);
     int index = 0;
@@ -226,19 +224,20 @@ vector<vector<SectionInfo>> produce_sections(string a, string b, vector<int> mpi
     int norm_width = ceil(total_width / (float) cell_width);
     int norm_height = ceil(total_height / (float) cell_height);
     vector<vector<SectionInfo>> sections;
-    for (int i = 0; i < cell_width + cell_height - 1; i++) {
+    for (int i = 0, index = 0; i < cell_width + cell_height - 1; i++) {
         int start_x = get_x(i, cell_height);
         int start_y = get_y(i, cell_height);
         int limit_x = end_x(start_x, start_y, cell_width - 1);
         vector<SectionInfo> diagonal;
-        for (int x = start_x, y = start_y, rank = 1; x <= limit_x; x++, y--, rank++) {
+        for (int x = start_x, y = start_y, rank = 1; x <= limit_x; x++, y--, rank++, index++) {
             SectionInfo info;
             info.rank = i == 0 ? 0 : rank;
+            info.index = index;
             info.start_x = max(0, x * norm_width);
             info.start_y = max(0, y * norm_height);
             info.end_x = min((x + 1) * norm_width - 1, total_width - 1);
             info.end_y = min((y + 1) * norm_height - 1, total_height - 1);
-            // cout << "[x:" << x << ", y:" << y << ", r:" << info.rank << "]" << endl;
+            // cout << "[i: " << index << ", x:" << x << ", y:" << y << ", r:" << info.rank << "]" << endl;
             // cout << "(sx: " << info.start_x << ", ex: " << info.end_x << 
             //             " - sy: " << info.start_y << ", ey: " << info.end_y <<
             //     ")" << endl;
@@ -255,7 +254,7 @@ void reverse_string(string& x) {
 }
 
 // Takes two strings and an LCS table and reconstructs the actual LCS string
-string reconstruct_lcs(vector<vector<int>> table, string a, string b) {
+string reconstruct_lcs(vector<vector<int>> &table, string a, string b) {
     string lcs = "";
     int y = a.length() - 1;
     int x = b.length() - 1;
@@ -279,18 +278,132 @@ string reconstruct_lcs(vector<vector<int>> table, string a, string b) {
     return lcs;
 }
 
-vector<vector<int>> repopulate(vector<vector<int>> table, SectionInfo info, int* contents, string a, string b) {
-    int index = 0;
-    for (int y = info.start_y; y <= info.end_y; y++) {
+void repopulate(vector<vector<int>> &table, SectionInfo info, int* contents, string a, string b) {
+    for (int y = info.start_y, index = 0; y <= info.end_y; y++) {
         for (int x = info.start_x; x <= info.end_x; x++, index++) {
-            table.at(y).at(x) = contents[index];
+            table[y][x] = contents[index];
         }
     }
-    // print_table(table, a, b);
-    return table;
 }
 
-vector<vector<int>> process_section(vector<vector<int>> table, SectionInfo info, string a, string b) {
+void send_section_info(SectionInfo section, int rank) {
+    int section_data[5] = {section.start_x, section.end_x, section.start_y, section.end_y, section.index};
+    // Send section info
+    MPI_Send(
+        &section_data,
+        5,
+        MPI_INT,
+        rank,
+        0, // Tag
+        MPI_COMM_WORLD);
+}
+
+void send_top(SectionInfo section, vector<vector<int>> &table, int rank) {
+    // Send top data
+    int* top = get_top(table, section);
+    int top_size = (section.end_x - section.start_x + 2);
+    MPI_Send(
+        top,
+        top_size,
+        MPI_INT,
+        rank,
+        0, // Tag
+        MPI_COMM_WORLD);
+}
+
+void send_left(SectionInfo section, vector<vector<int>> &table, int rank) {
+    // Send left
+    int* left = get_left(table, section);
+    int left_size = (section.end_y - section.start_y + 1);
+    // Send left data
+    MPI_Send(
+        left,
+        left_size,
+        MPI_INT,
+        rank,
+        0, // Tag
+        MPI_COMM_WORLD);
+}
+
+void send_close(int rank) {
+    int close_data[4] = {-1, -1, -1, -1};
+    // Send close
+    MPI_Send(
+        &close_data,
+        4,
+        MPI_INT,
+        rank,
+        0, // Tag
+        MPI_COMM_WORLD);
+}
+
+void send_section(int* section_data, int size) {
+    // Pass back to root
+    MPI_Send(
+        section_data,
+        size,
+        MPI_INT,
+        0, // Destination
+        0, // Tag
+        MPI_COMM_WORLD);
+}
+
+int* receive_section(SectionInfo section, int rank) {
+    int section_size = (section.end_x - section.start_x + 1) * (section.end_y - section.start_y + 1);
+    int* section_content  = (int*) malloc(sizeof(int) * section_size);
+    MPI_Recv(
+        section_content,
+        section_size,
+        MPI_INT,
+        rank,
+        0,
+        MPI_COMM_WORLD,
+        MPI_STATUS_IGNORE);
+    return section_content;
+}
+
+int* receive_border(int size) {
+    int* border = (int*) malloc(sizeof(int) * size);
+    MPI_Recv(
+        border,
+        size,
+        MPI_INT,
+        0,
+        0,
+        MPI_COMM_WORLD,
+        MPI_STATUS_IGNORE);
+    return border;
+}
+
+SectionInfo receive_info(int rank) {
+    int section[5];
+    MPI_Recv(
+        &section,
+        5,
+        MPI_INT,
+        0,
+        0,
+        MPI_COMM_WORLD,
+        MPI_STATUS_IGNORE);
+    
+
+    // cout << "rank: " << rank << " index: " << section[4] << endl;
+    // cout << "sx: " << section[0] << ", ex: " << section[1] << endl;
+    // cout << "sy: " << section[2] << ", ey: " << section[3] << endl << endl;
+
+    SectionInfo info;
+
+    info.start_x = section[0];
+    info.end_x = section[1];
+    info.start_y = section[2];
+    info.end_y = section[3];
+    info.index = section[4];
+    info.rank = rank;
+    
+    return info;
+}
+
+void process_section(vector<vector<int>> &table, SectionInfo info, string a, string b) {
     int top_size = (info.end_x - info.start_x + 2);
     int left_size = (info.end_y - info.start_y + 1);
     int end_a = left_size;
@@ -299,16 +412,28 @@ vector<vector<int>> process_section(vector<vector<int>> table, SectionInfo info,
     string b_sub = b.substr(info.start_x, end_b);
     int* top = get_top(table, info);
     int* left = get_left(table, info);
-    vector<vector<int>> table_sub = construct_table(a_sub.length(), b_sub.length());
+    vector<vector<int>> section_table = construct_table(a_sub.length(), b_sub.length());
 
-    int* result = extract_solution(diagonal_lcs(table_sub, a_sub, b_sub, top, left));
+    diagonal_lcs(section_table, a_sub, b_sub, top, left);
 
+    // print_table(section_table, a_sub, b_sub);
 
+    int* result = extract_solution(section_table);
 
-    table = repopulate(table, info, result, a, b);
+    repopulate(table, info, result, a, b);
+}
 
-    // print_table(table, a, b);
-    return table;
+int* process_worker_section(SectionInfo info, string a, string b, int* top, int* left, int section_height, int section_width) {
+    string a_sub = a.substr(info.start_y, section_height);
+    string b_sub = b.substr(info.start_x, section_width);
+
+    vector<vector<int>> section_table = construct_table(section_height, section_width);
+
+    diagonal_lcs(section_table, a_sub, b_sub, top, left);
+
+    // print_table(section_table, a_sub, b_sub);
+
+    return extract_solution(section_table);
 }
 
 string lcs_parallel(string a, string b, string outfile) {
@@ -329,151 +454,91 @@ string lcs_parallel(string a, string b, string outfile) {
     if (my_mpi_rank == 0) {
         vector<vector<SectionInfo>> sections = produce_sections(a, b, dims);
         // Process first section
-        table = process_section(table, sections[0][0], a, b);
+        process_section(table, sections[0][0], a, b);
 
         for (int diagonal = 1; diagonal < (int) sections.size() - 1; diagonal++) {
-            for (int index = 0, rank = 1; index < (int) sections[diagonal].size() - 1; index++, rank++) {
+
+            for (int index = 0, rank = 1; index < (int) sections[diagonal].size(); index++, rank++) {
                 // Send top
                 SectionInfo section = sections[diagonal][index];
                 
-                int section_data[4] = {section.start_x, section.end_x, section.start_y, section.end_y};
-                    // Send info
-                MPI_Send(
-                    &section_data,
-                    4,
-                    MPI_INT,
-                    rank,
-                    0, // Tag
-                    MPI_COMM_WORLD);
-
-                // Send top data
-                int* top = get_top(table, section);
-                int top_size = (section.end_x - section.start_x + 2);
-                MPI_Send(
-                    top,
-                    top_size,
-                    MPI_INT,
-                    rank,
-                    0, // Tag
-                    MPI_COMM_WORLD);
-
-                // Send left
-                int* left = get_left(table, section);
-                int left_size = (section.end_y - section.start_y + 1);
-                // Send left data
-                MPI_Send(
-                    left,
-                    left_size,
-                    MPI_INT,
-                    rank,
-                    0, // Tag
-                    MPI_COMM_WORLD);
+                send_section_info(section, rank);
+                send_top(section, table, rank);
+                send_left(section, table, rank);
             }
 
-            for (int index = 0, rank = 1; index < (int) sections[diagonal].size() - 1; index++, rank++) {
+            for (int index = 0, rank = 1; index < (int) sections[diagonal].size(); index++, rank++) {
+
                 // Receive 
                 SectionInfo section = sections[diagonal][index];
-                int section_size = (section.end_x - section.start_x + 1) * (section.end_y - section.start_y + 1);
-                int* section_content = (int*) malloc(sizeof(int) * section_size);
-                MPI_Recv(
-                    section_content,
-                    section_size,
-                    MPI_INT,
-                    rank,
-                    0,
-                    MPI_COMM_WORLD,
-                    MPI_STATUS_IGNORE);
-                // Populate table
+                int* section_content = receive_section(section, rank);
+        
                 repopulate(table, section, section_content, a, b);
+
             }
         }
+
+        for (int rank = 1; rank < num_procs; rank++) {
+            send_close(rank);
+        }
+
         // Process last section
         if (sections.size() > 1) {
             SectionInfo last = sections[sections.size() - 1][0];
-            table = process_section(table, last, a, b);
+            process_section(table, last, a, b);
         }
+
+        // print_table(table, a, b);
         
         // Backtrace
         string lcs = reconstruct_lcs(table, a, b);
 
-        // Finalise
         MPI_Finalize();
-        
         return lcs;
+
     } else {
     // Worker processes
-        // Receive Section Info
         while (1) {
-            int section[4];
-            MPI_Recv(
-                &section,
-                4,
-                MPI_INT,
-                0,
-                0,
-                MPI_COMM_WORLD,
-                MPI_STATUS_IGNORE);
-            cout << "S: " << section[0] << endl;
-            int start_x = section[0];
-            int end_x = section[1];
-            int start_y = section[2];
-            int end_y = section[3];
+            SectionInfo section = receive_info(my_mpi_rank);
 
-            int top_size = (end_x - start_x + 2);
-            int left_size = (end_y - start_y + 1);
+            if (section.start_x == -1) {
+                MPI_Finalize();
+                exit(0);
+            }
 
-            // Receive Top Data
-            int* top = (int*) malloc(sizeof(int) * top_size);
-            MPI_Recv(
-                top,
-                top_size,
-                MPI_INT,
-                0,
-                0,
-                MPI_COMM_WORLD,
-                MPI_STATUS_IGNORE);
+            int section_height = section.end_y - section.start_y + 1;
+            int section_width = section.end_x - section.start_x + 1;
 
-            // Receive Left Data
-            int* left = (int*) malloc(sizeof(int) * left_size);
-            MPI_Recv(
-                left,
-                left_size,
-                MPI_INT,
-                0,
-                0,
-                MPI_COMM_WORLD,
-                MPI_STATUS_IGNORE);
+            int* top = receive_border(section_width + 1);
+            int* left = receive_border(section_height);
 
-            string a_sub = a.substr(start_y, left_size);
-            string b_sub = b.substr(start_x, top_size - 1);
-            vector<vector<int>> table_sub = construct_table(a_sub.length(), b_sub.length());
+            int* result = process_worker_section(section, a, b, top, left, section_height, section_width);
 
-            int* result = extract_solution(diagonal_lcs(table, a_sub, b_sub, top, left));
-            int size = (int) (a_sub.length() * b_sub.length());
+            int size = section_height * section_width;
 
-            // Pass back to root
-            MPI_Send(
-                result,
-                size,
-                MPI_INT,
-                0, // Destination
-                0, // Tag
-                MPI_COMM_WORLD);
+            send_section(result, size);
         }
         
     }
 
 }
 
-void gather_strings(string file_name, string* x, string* y) {
+/**
+ * Gets the input strings from the specified file and populates the two given
+ * strings.
+ * @param input_file_path - file to read strings from
+ * @param a - pointer to first string to populate
+ * @param b - pointer to second string to populate
+ */ 
+void gather_strings(string input_file_path, string* a, string* b) {
     // Read in sequences to compare
     fstream input_file;
-    input_file.open(file_name);
+    input_file.open(input_file_path);
 
     if (input_file.is_open()) {
         string buffer;
-        if (!getline(input_file, *x) ||
-            !getline(input_file, *y)) {
+        if (!getline(input_file, *a) ||
+            !getline(input_file, *b)) {
             cerr << "Error reading from provided file." << endl;
             exit(3);
         }
@@ -483,6 +548,24 @@ void gather_strings(string file_name, string* x, string* y) {
     }
 }
 
+/**
+ * Writes the given LCS out to the file specified and prints it to stdout
+ * @param lcs - the string to write
+ * @param output_file_path - the path of the file to write to
+ */ 
+void write_lcs(string lcs, string output_file_path) {
+    ofstream output_file;
+    output_file.open(output_file_path);
+
+    if (output_file.is_open()) {
+        output_file << lcs;
+    } else {
+        cerr << "Could not write to given output file." << endl;
+        exit(4);
+    }
+
+    cout << lcs << endl;
+}
 
 int main(int argc, char** argv) {
     // Check args and capture input/output file names
@@ -492,26 +575,13 @@ int main(int argc, char** argv) {
         exit(1);
     }
 
-    // Get arguments
     string file_name = argv[1];
     string output_file_name = argv[2];
 
-    string string_a;
-    string string_b;
-
+    string string_a, string_b;
     gather_strings(file_name, &string_a, &string_b);
 
     string lcs = lcs_parallel(string_a, string_b, output_file_name);
-    
-    cout << lcs << endl;
 
-    ofstream output_file;
-    output_file.open(output_file_name);
-
-    if (output_file.is_open()) {
-        output_file << lcs;
-    } else {
-        cerr << "Could not write to given output file." << endl;
-        exit(4);
-    }
+    write_lcs(lcs, output_file_name);
 }

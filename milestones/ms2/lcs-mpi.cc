@@ -394,7 +394,7 @@ string lcs_parallel(string a, string b, string outfile) {
                 0,
                 MPI_COMM_WORLD,
                 MPI_STATUS_IGNORE);
-
+            cout << "sx: " << section[0] << " ex: " << section[1] << endl;
             int start_x = section[0];
             int end_x = section[1];
             int start_y = section[2];
@@ -430,7 +430,7 @@ string lcs_parallel(string a, string b, string outfile) {
             vector<vector<int>> table_sub = construct_table(a_sub.length(), b_sub.length());
 
             int* result = extract_solution(diagonal_lcs(table, a_sub, b_sub, top, left));
-            int size = (int) (a.length() * b.length());
+            int size = (int) (a_sub.length() * b_sub.length());
 
             // Pass back to root
             MPI_Send(
