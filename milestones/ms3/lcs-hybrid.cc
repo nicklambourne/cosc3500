@@ -111,6 +111,16 @@ int get_y(int index, int height) {
     }
 }
 
+/**
+ * Gets the value in the cell to top left of the given coordinates.
+ * @param table - table in which the cells reside
+ * @param x - x-coordinate of original cell
+ * @param y - y-coordinate of original cell
+ * @param top - the row of values to the top of the specified coordinates
+ * @param left - the column of values to the left of the specified coordinates
+ * @return - the value of the cell to the top left of the given coordinates
+ *           or 0, if unreachable.
+ */
 int get_top_left(vector<vector<int>> &table, int x, int y, int* top, int* left) {
     if (y == 0) {
         return top[x];
@@ -121,6 +131,17 @@ int get_top_left(vector<vector<int>> &table, int x, int y, int* top, int* left) 
     return table[y - 1][x - 1];
 }
 
+/**
+ * Calculates the value for a cell in the table, based on max of the top and 
+ * left adjacent cells. If the corresponding letters of a and b match at those 
+ * indices, instead return the value of the top-left diagonally adjacent cell
+ * plus one.
+ * @param x - x-coordinate of target cell
+ * @param y - y-coordinate of target cell
+ * @param top - the row of values to the top of the specified coordinates
+ * @param left - the column of values to the left of the specified coordinates
+ * @return - the calculated value to populate the target cell with
+ */
 int calculate_cell(vector<vector<int>> &table, int x, int y,
                    string a, string b, int* top, int* left) {
     int left_cell = x > 0 && y >= 0 ? table[y][x - 1] : left[y];
@@ -133,7 +154,8 @@ int calculate_cell(vector<vector<int>> &table, int x, int y,
     }
 }
 
-void diagonal_lcs(vector<vector<int>> &table, string a, string b, int* top, int* left) {
+void diagonal_lcs(vector<vector<int>> &table, string a, string b, 
+                  int* top, int* left) {
     int height = a.length();
     int width = b.length();
     vector<vector<vector<int>>> indices;
