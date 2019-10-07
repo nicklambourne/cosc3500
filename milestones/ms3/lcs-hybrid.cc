@@ -442,6 +442,18 @@ SectionInfo receive_info(int rank) {
     return info;
 }
 
+/**
+ * Populates a single (sub-) section of the table as defined by a SectionInfo instance.
+ * Relies on having access to root-process-only information (e.g. the full table).
+ * @param table - a two-dimensional vector which represents the (sub-) section
+ *                to calculate
+ * @param info - the SectionInfo instance that defines the boundaries of the section.
+ * @param a - the string represented on the vertical axis
+ * @param b - the string represented on the horizontal axis
+ * @param top - the row of values to the top of the specified coordinates
+ * @param left - the column of values to the left of the specified coordinates
+ * @return - the calculated value to populate the target cell with
+ */
 void process_section(vector<vector<int>> &table, SectionInfo info, string a, string b) {
     int top_size = (info.end_x - info.start_x + 2);
     int left_size = (info.end_y - info.start_y + 1);
@@ -462,7 +474,21 @@ void process_section(vector<vector<int>> &table, SectionInfo info, string a, str
     repopulate(table, info, result, a, b);
 }
 
-int* process_worker_section(SectionInfo info, string a, string b, int* top, int* left, int section_height, int section_width) {
+/**
+ * Populates a single (sub-) section of the table in a worker process.
+ * Worker processes have access to different information, in different formats,
+ * compared to that of process_section.
+ * @param info - the SectionInfo instance that defines the boundaries of the section.
+ * @param a - the string represented on the vertical axis
+ * @param b - the string represented on the horizontal axis
+ * @param top - the row of values to the top of the specified coordinates
+ * @param left - the column of values to the left of the specified coordinates
+ * @param section_height - the total height of the subsection under calculation
+ * @param section_width -  the total width of the subsection under calculation
+ * @return - a single-dimensional array containing the populated section values
+ */
+int* process_worker_section(SectionInfo info, string a, string b, int* top, 
+                            int* left, int section_height, int section_width) {
     string a_sub = a.substr(info.start_y, section_height);
     string b_sub = b.substr(info.start_x, section_width);
 
@@ -475,7 +501,11 @@ int* process_worker_section(SectionInfo info, string a, string b, int* top, int*
     return extract_solution(section_table);
 }
 
+/**
+ * Calculates, in parallel, 
+ */
 string lcs_parallel(string a, string b, string outfile) {
+    // Short circuit in the event on an empty string in a or b
     if (a.length() == 0 || b.length() == 0) {
         return "";
     }
@@ -497,18 +527,24 @@ string lcs_parallel(string a, string b, string outfile) {
 
         for (int diagonal = 1; diagonal < (int) sections.size() - 1; diagonal++) {
 
-            for (int index = 0, rank = 1; index < (int) sections[diagonal].size(); index++, rank++) {
-                // Send top
+            // Distribute sections to worker processes
+            #pragma omp parallel for shared(table)
+            for (int index = 0; index < (int) sections[diagonal].size(); index++) {
+                
+                int rank = index + 1;
                 SectionInfo section = sections[diagonal][index];
                 
                 send_section_info(section, rank);
                 send_top(section, table, rank);
                 send_left(section, table, rank);
+
             }
 
-            for (int index = 0, rank = 1; index < (int) sections[diagonal].size(); index++, rank++) {
+            // Receive computed solutions from worker processes
+            #pragma omp parallel for shared(table, a, b, sections)
+            for (int index = 0; index < (int) sections[diagonal].size(); index++) {
 
-                // Receive 
+                int rank = index + 1; // Recieve from non-zero (non-root) processes
                 SectionInfo section = sections[diagonal][index];
                 int* section_content = receive_section(section, rank);
         
@@ -536,10 +572,11 @@ string lcs_parallel(string a, string b, string outfile) {
         return lcs;
 
     } else {
-    // Worker processes
+        // Worker processes
         while (1) {
             SectionInfo section = receive_info(my_mpi_rank);
 
+            // Detect end of computation
             if (section.start_x == -1) {
                 MPI_Finalize();
                 exit(0);
