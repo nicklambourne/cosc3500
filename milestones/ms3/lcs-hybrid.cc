@@ -74,10 +74,22 @@ void print_table(vector<vector<int>> &table, string a, string b) {
     }
 }
 
-int end_x(int x, int y, int width) {
-    return min(x + y, width);
+/**
+ * Finds the x-coordinate for the last cell in an (anti-) diagonal.
+ * @param x - the x-coordinate of the starting cell of the diagonal
+ * @param y - the y-coordinate of the starting cell of the diagonal
+ * @param width - the total width of the table
+ * @return - the x-coordinate of the last cell in the diagonal
+ */
+int end_x(int start_x, int start_y, int width) {
+    return min(start_x + start_y, width);
 }   
 
+/**
+ * Provides the x-coordinate for a cell in a diagonal based on index.
+ * @param index - the index number of the cell
+ * @param height - the total height of the table
+ */
 int get_x(int index, int height) {
     if (index < height) {
         return 0;
@@ -86,6 +98,11 @@ int get_x(int index, int height) {
     }
 }
 
+/**
+ * Provides the y-coordinate for a cell in a diagonal based on index.
+ * @param index - the index number of the cell
+ * @param height - the total height of the table
+ */
 int get_y(int index, int height) {
     if (index >= height) {
         return height - 1;

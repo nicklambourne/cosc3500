@@ -21,7 +21,7 @@ echo "Now we start the show:"
 export TIMEFORMAT="%E sec"
 
 module load mpi/openmpi-x86_64
-time mpirun -n ${SLURM_NPROCS} ./bin/lcs-hybrid ./test/extra-long.txt ./test/extra-long-p.out
+time mpirun -n ${SLURM_NPROCS} ./bin/lcs-hybrid ./test/extra-long.txt ./test/extra-long-p8.out
 
 DATE=$(date +"%Y%m%d%H%M")
 echo "time finished "$DATE
