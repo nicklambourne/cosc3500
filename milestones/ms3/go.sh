@@ -2,13 +2,15 @@
 #SBATCH −−partition=coursework
 #SBATCH −−job−name=:sad_parrot:
 #SBATCH −−nodes=1
-#SBATCH −−ntasks=8
-#SBATCH −−ntasks−per−node=8
-#SBATCH −−cpus−per−task=8
+#SBATCH −−ntasks=4
+#SBATCH −−ntasks−per−node=4
+#SBATCH −−cpus−per−task=4
 
-export OMP_NUM_THREADS=8
-export SLURM_TASKS_PER_NODE=8
-export SLURM_NPROCS=8
+# export SLURM_JOB_NUM_NODES=2
+# export SLURM_CPUS_ON_NODE=2
+export OMP_NUM_THREADS=4
+# export SLURM_TASKS_PER_NODE=2
+export SLURM_NPROCS=4
 
 DATE=$(date +"%Y%m%d%H%M")
 echo "time started "$DATE

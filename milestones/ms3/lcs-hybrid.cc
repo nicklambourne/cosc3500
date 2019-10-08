@@ -9,6 +9,7 @@
 
 using namespace std;
 
+
 // Information pertaining to the dimensions and location of a subsection.
 typedef struct {
     int rank;
@@ -136,8 +137,11 @@ int get_top_left(vector<vector<int>> &table, int x, int y, int* top, int* left) 
  * left adjacent cells. If the corresponding letters of a and b match at those 
  * indices, instead return the value of the top-left diagonally adjacent cell
  * plus one.
+ * @param table - the table containing the cell being calculated
  * @param x - x-coordinate of target cell
  * @param y - y-coordinate of target cell
+ * @param a - the string represented on the y-axis.
+ * @param b - the string represented on the x-axis.
  * @param top - the row of values to the top of the specified coordinates
  * @param left - the column of values to the left of the specified coordinates
  * @return - the calculated value to populate the target cell with
@@ -154,6 +158,16 @@ int calculate_cell(vector<vector<int>> &table, int x, int y,
     }
 }
 
+/**
+ * Calculate and populate a single (sub-) section of a table using OpenMP by 
+ * (anti-) diagonals.
+ * @param table - the table containing the cell being calculated
+ * @param a - the string represented on the y-axis.
+ * @param b - the string represented on the x-axis.
+ * @param top - the row of values to the top of the specified coordinates
+ * @param left - the column of values to the left of the specified coordinates.
+ * 
+ */
 void diagonal_lcs(vector<vector<int>> &table, string a, string b, 
                   int* top, int* left) {
     int height = a.length();
@@ -183,6 +197,14 @@ void diagonal_lcs(vector<vector<int>> &table, string a, string b,
     }
 }
 
+/**
+ * Gets the row of data to the top of the specified section from a table.
+ * N.B. includes one cell to the left of the section in the "top" row.
+ * @param table - the table containing the section
+ * @param info - the SectionInfo instance describing the section
+ * @return - a one-dimensional array of the data for the row to the top of the
+ *           section.
+ */
 int* get_top(vector<vector<int>> &table, SectionInfo info) {
     int top_size = info.end_x - info.start_x + 2;
     int* top = (int*) calloc(top_size, sizeof(int));
@@ -202,6 +224,13 @@ int* get_top(vector<vector<int>> &table, SectionInfo info) {
     return top;
 }
 
+/**
+ * Gets the column of data to the top of the specified section from a table.
+ * @param table - the table containing the section
+ * @param info - the SectionInfo instance describing the section
+ * @return - a one-dimensional array of the data for the row to the top of the
+ *           section.
+ */
 int* get_left(vector<vector<int>> &table, SectionInfo info) {
     int left_size = info.end_y - info.start_y + 1;
     int* left = (int*) calloc(left_size, sizeof(int));
@@ -276,10 +305,6 @@ vector<vector<SectionInfo>> produce_sections(string a, string b, vector<int> mpi
             info.start_y = max(0, y * norm_height);
             info.end_x = min((x + 1) * norm_width - 1, total_width - 1);
             info.end_y = min((y + 1) * norm_height - 1, total_height - 1);
-            // cout << "[i: " << index << ", x:" << x << ", y:" << y << ", r:" << info.rank << "]" << endl;
-            // cout << "(sx: " << info.start_x << ", ex: " << info.end_x << 
-            //             " - sy: " << info.start_y << ", ey: " << info.end_y <<
-            //     ")" << endl;
             diagonal.push_back(info);
         }
         sections.push_back(diagonal);
@@ -317,7 +342,17 @@ string reconstruct_lcs(vector<vector<int>> &table, string a, string b) {
     return lcs;
 }
 
-void repopulate(vector<vector<int>> &table, SectionInfo info, int* contents, string a, string b) {
+/**
+ * Takes a (sub-) section of data and populates the master table with it.
+ * @param table - the master table to write data to
+ * @param info - SectionInfo instance describing bounds of section
+ * @param contents - the computed values of the (sub-) section in a one-
+ *                   dimensional array.
+ * @param a - the string represented on the vertical axis
+ * @param b - the string represented on the horizontal axis
+ */
+void repopulate(vector<vector<int>> &table, SectionInfo info, int* contents,
+                string a, string b) {
     for (int y = info.start_y, index = 0; y <= info.end_y; y++) {
         for (int x = info.start_x; x <= info.end_x; x++, index++) {
             table[y][x] = contents[index];
@@ -325,8 +360,15 @@ void repopulate(vector<vector<int>> &table, SectionInfo info, int* contents, str
     }
 }
 
+/**
+ * Sends the data describing the section to work on to a worker process.
+ * Data is: start_x, end_x, start_y, end_y, index.
+ * @param section - the section being calculated by the worker
+ * @param rank - the rank sending to
+ */
 void send_section_info(SectionInfo section, int rank) {
-    int section_data[5] = {section.start_x, section.end_x, section.start_y, section.end_y, section.index};
+    int section_data[5] = {section.start_x, section.end_x, 
+                           section.start_y, section.end_y, section.index};
     // Send section info
     MPI_Send(
         &section_data,
@@ -337,6 +379,12 @@ void send_section_info(SectionInfo section, int rank) {
         MPI_COMM_WORLD);
 }
 
+/**
+ * Retreives and sends the column of "top" data to a worker process.
+ * @param section - the section being calculated by the worker
+ * @param table - the master table to retreive data from
+ * @param rank - the rank sending to
+ */
 void send_top(SectionInfo section, vector<vector<int>> &table, int rank) {
     // Send top data
     int* top = get_top(table, section);
@@ -350,10 +398,16 @@ void send_top(SectionInfo section, vector<vector<int>> &table, int rank) {
         MPI_COMM_WORLD);
 }
 
+/**
+ * Retreives and sends the column of "left" data to a worker process.
+ * @param section - the section being calculated by the worker
+ * @param table - the master table to retreive data from
+ * @param rank - the rank sending to
+ */
 void send_left(SectionInfo section, vector<vector<int>> &table, int rank) {
-    // Send left
     int* left = get_left(table, section);
     int left_size = (section.end_y - section.start_y + 1);
+    
     // Send left data
     MPI_Send(
         left,
@@ -364,6 +418,10 @@ void send_left(SectionInfo section, vector<vector<int>> &table, int rank) {
         MPI_COMM_WORLD);
 }
 
+/**
+ * Sends directive to a worker process to cease operation and exit.
+ * @param rank - the rank to send the close information to.
+ */
 void send_close(int rank) {
     int close_data[4] = {-1, -1, -1, -1};
     // Send close
@@ -371,11 +429,17 @@ void send_close(int rank) {
         &close_data,
         4,
         MPI_INT,
-        rank,
-        0, // Tag
+        rank, // Destination
+        0,    // Tag
         MPI_COMM_WORLD);
 }
 
+/**
+ * Send a completed section back to the root process via MPI send.
+ * @param section_data - the contents of the section as a one-dimensional 
+ *                       array.
+ * @param size - the total number of elements/cells in the section
+ */
 void send_section(int* section_data, int size) {
     // Pass back to root
     MPI_Send(
@@ -387,8 +451,16 @@ void send_section(int* section_data, int size) {
         MPI_COMM_WORLD);
 }
 
+/**
+ * Receive a computed (sub-) section from a worker process via blocking MPI 
+ * send.
+ * @param section - SectionInfo intance describing the section being received
+ * @param rank - the rank the information is being received from
+ * @return - a one-dimensional array containing the section content
+ */
 int* receive_section(SectionInfo section, int rank) {
-    int section_size = (section.end_x - section.start_x + 1) * (section.end_y - section.start_y + 1);
+    int section_size = (section.end_x - section.start_x + 1) * 
+                        (section.end_y - section.start_y + 1);
     int* section_content  = (int*) malloc(sizeof(int) * section_size);
     MPI_Recv(
         section_content,
@@ -401,6 +473,13 @@ int* receive_section(SectionInfo section, int rank) {
     return section_content;
 }
 
+/** 
+ * Blocking MPI receive for worker processes receiving either top or left
+ * information it needs to process its (sub-) section.
+ * @param size - the number of elements expected in the border section
+ *               (based on info received in receive_info)
+ * @return - a one-dimensional array containing the border information
+ */
 int* receive_border(int size) {
     int* border = (int*) malloc(sizeof(int) * size);
     MPI_Recv(
@@ -414,6 +493,12 @@ int* receive_border(int size) {
     return border;
 }
 
+/**
+ * Blocking MPI receive for worker prcesses receiving information about the
+ * section it is tasked with calculating.
+ * @param rank - the rank of the process recieving
+ * @return - a populated SectionInfo instance with the received information
+ */
 SectionInfo receive_info(int rank) {
     int section[5];
     MPI_Recv(
@@ -424,11 +509,6 @@ SectionInfo receive_info(int rank) {
         0,
         MPI_COMM_WORLD,
         MPI_STATUS_IGNORE);
-    
-
-    // cout << "rank: " << rank << " index: " << section[4] << endl;
-    // cout << "sx: " << section[0] << ", ex: " << section[1] << endl;
-    // cout << "sy: " << section[2] << ", ey: " << section[3] << endl << endl;
 
     SectionInfo info;
 
@@ -443,18 +523,22 @@ SectionInfo receive_info(int rank) {
 }
 
 /**
- * Populates a single (sub-) section of the table as defined by a SectionInfo instance.
- * Relies on having access to root-process-only information (e.g. the full table).
+ * Populates a single (sub-) section of the table as defined by a SectionInfo
+ * instance.
+ * Relies on having access to root-process-only information (e.g. the full 
+ * table).
  * @param table - a two-dimensional vector which represents the (sub-) section
  *                to calculate
- * @param info - the SectionInfo instance that defines the boundaries of the section.
+ * @param info - the SectionInfo instance that defines the boundaries of the 
+ *               section.
  * @param a - the string represented on the vertical axis
  * @param b - the string represented on the horizontal axis
  * @param top - the row of values to the top of the specified coordinates
  * @param left - the column of values to the left of the specified coordinates
  * @return - the calculated value to populate the target cell with
  */
-void process_section(vector<vector<int>> &table, SectionInfo info, string a, string b) {
+void process_section(vector<vector<int>> &table, SectionInfo info, string a, 
+                     string b) {
     int top_size = (info.end_x - info.start_x + 2);
     int left_size = (info.end_y - info.start_y + 1);
     int end_a = left_size;
@@ -463,7 +547,8 @@ void process_section(vector<vector<int>> &table, SectionInfo info, string a, str
     string b_sub = b.substr(info.start_x, end_b);
     int* top = get_top(table, info);
     int* left = get_left(table, info);
-    vector<vector<int>> section_table = construct_table(a_sub.length(), b_sub.length());
+    vector<vector<int>> section_table = construct_table(a_sub.length(), 
+                                                        b_sub.length());
 
     diagonal_lcs(section_table, a_sub, b_sub, top, left);
 
@@ -478,7 +563,8 @@ void process_section(vector<vector<int>> &table, SectionInfo info, string a, str
  * Populates a single (sub-) section of the table in a worker process.
  * Worker processes have access to different information, in different formats,
  * compared to that of process_section.
- * @param info - the SectionInfo instance that defines the boundaries of the section.
+ * @param info - the SectionInfo instance that defines the boundaries of the 
+ *               section.
  * @param a - the string represented on the vertical axis
  * @param b - the string represented on the horizontal axis
  * @param top - the row of values to the top of the specified coordinates
@@ -492,7 +578,8 @@ int* process_worker_section(SectionInfo info, string a, string b, int* top,
     string a_sub = a.substr(info.start_y, section_height);
     string b_sub = b.substr(info.start_x, section_width);
 
-    vector<vector<int>> section_table = construct_table(section_height, section_width);
+    vector<vector<int>> section_table = construct_table(section_height, 
+                                                        section_width);
 
     diagonal_lcs(section_table, a_sub, b_sub, top, left);
 
@@ -502,15 +589,21 @@ int* process_worker_section(SectionInfo info, string a, string b, int* top,
 }
 
 /**
- * Calculates, in parallel, 
+ * Calculates, in parallel (using OpenMP and MPI) the longest comment 
+ * subsequence between the two given strings.
+ * @param a - the first string (represented on the y-axis of the LCS table)
+ * @param b - the second string (represent on the x-axis of the LCS table)
+ * @return - the computed longest common subsequence
  */
-string lcs_parallel(string a, string b, string outfile) {
+string lcs_parallel(string a, string b, int argc, char** argv) {
     // Short circuit in the event on an empty string in a or b
     if (a.length() == 0 || b.length() == 0) {
         return "";
     }
     
-    MPI_Init(NULL, NULL);
+    int provided;
+
+    MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &provided);
 
     int num_procs;
     MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
@@ -527,17 +620,14 @@ string lcs_parallel(string a, string b, string outfile) {
 
         for (int diagonal = 1; diagonal < (int) sections.size() - 1; diagonal++) {
 
+            cout << "Starting diagonal : " << diagonal << endl;
+
             // Distribute sections to worker processes
-            #pragma omp parallel for shared(table)
+            #pragma omp parallel for shared(table, sections, diagonal)
             for (int index = 0; index < (int) sections[diagonal].size(); index++) {
-                
+            
                 int rank = index + 1;
                 SectionInfo section = sections[diagonal][index];
-                
-                send_section_info(section, rank);
-                send_top(section, table, rank);
-                send_left(section, table, rank);
-
             }
 
             // Receive computed solutions from worker processes
@@ -547,9 +637,8 @@ string lcs_parallel(string a, string b, string outfile) {
                 int rank = index + 1; // Recieve from non-zero (non-root) processes
                 SectionInfo section = sections[diagonal][index];
                 int* section_content = receive_section(section, rank);
-        
-                repopulate(table, section, section_content, a, b);
 
+                repopulate(table, section, section_content, a, b);
             }
         }
 
@@ -575,6 +664,8 @@ string lcs_parallel(string a, string b, string outfile) {
         // Worker processes
         while (1) {
             SectionInfo section = receive_info(my_mpi_rank);
+
+            cout << "Received section info: " << my_mpi_rank << endl; 
 
             // Detect end of computation
             if (section.start_x == -1) {
@@ -643,10 +734,15 @@ void write_lcs(string lcs, string output_file_path) {
     cout << lcs << endl;
 }
 
+/**
+ * A command-line utility for calculating, in parallel (using OpenMP and MPI),
+ * the longest comment subsequence between two given strings.
+ * Usage: lcs-hybrid <input_file> <output_file>
+ */
 int main(int argc, char** argv) {
     // Check args and capture input/output file names
     if (argc != 3) {
-        cerr << "Invalid call:\n Usage: ass1 <input_file> <output_file>" \
+        cerr << "Invalid call:\n Usage: lcs-hybrid <input_file> <output_file>" \
              << endl;
         exit(1);
     }
@@ -657,7 +753,7 @@ int main(int argc, char** argv) {
     string string_a, string_b;
     gather_strings(file_name, &string_a, &string_b);
 
-    string lcs = lcs_parallel(string_a, string_b, output_file_name);
+    string lcs = lcs_parallel(string_a, string_b, argc, argv);
 
     write_lcs(lcs, output_file_name);
 }
