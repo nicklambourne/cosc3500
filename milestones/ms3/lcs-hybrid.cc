@@ -242,6 +242,11 @@ int* get_left(vector<vector<int>> &table, SectionInfo info) {
     return left;
 }
 
+/**
+ * Transfers the contents of a table to a one-dimensional array.
+ * @param table - a two-dimensional vector to extract the data from
+ * @return a one-dimentional array the data has been written to
+ */
 int* extract_solution(vector<vector<int>> &table) {
     int size = (table.size() * table[0].size());
     int* single_dim = (int*) malloc(sizeof(int) * size);
@@ -254,15 +259,16 @@ int* extract_solution(vector<vector<int>> &table) {
     return single_dim;
 }
 
-vector<string> get_substrings(string str, int size) {
-    vector<string> substrings;
-    for (int i = 0; i < (int) str.length(); i += size) {
-        int limit = min((int) str.length() - i, size);
-        substrings.push_back(str.substr(i, limit));
-    }
-    return substrings;
-}
-
+/**
+ * Works out the amount of sections to split the table into based on
+ * the number of processes given and the sizes of the strings.
+ * Divides evenly along a and b such that the number of sections along
+ * the anti-diagonal is equal to num_procs - 1. One is left for the root.
+ * @param num_procs - the number of MPI processes available to the program
+ * @param a - the string represented along the table's y-axis.
+ * @param b - thr string represented along the table's x-axis.
+ * @return - a two-element vector representing {height, width}
+ */
 vector<int> get_mpi_dimensions(int num_procs, string a, string b) {
      // Height, Width
     vector<int> dims = {1, 1};
@@ -284,6 +290,9 @@ vector<int> get_mpi_dimensions(int num_procs, string a, string b) {
     return dims;
 }
 
+/**
+ * 
+ */
 vector<vector<SectionInfo>> produce_sections(string a, string b, vector<int> mpi_dims) {
     int cell_width = mpi_dims[1];
     int cell_height = mpi_dims[0];
@@ -312,12 +321,21 @@ vector<vector<SectionInfo>> produce_sections(string a, string b, vector<int> mpi
     return sections;
 } 
 
-// Reverses a string in place
+/**
+ * Reverses a string in place
+ * @param x - the memory address of the string to reverse
+ */
 void reverse_string(string& x) {
     reverse(x.begin(), x.end());
 }
 
-// Takes two strings and an LCS table and reconstructs the actual LCS string
+/**
+ * Takes two strings and an LCS table and reconstructs the actual LCS string.
+ * @param table - a populated table produced by e.g. lcs_parallel
+ * @param a - the string represented on the table's y-axis
+ * @param b - the string represented on the table's x-axis
+ * @return - the LCS string
+ */
 string reconstruct_lcs(vector<vector<int>> &table, string a, string b) {
     string lcs = "";
     int y = a.length() - 1;
@@ -602,7 +620,6 @@ string lcs_parallel(string a, string b, int argc, char** argv) {
     }
     
     int provided;
-
     MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &provided);
 
     int num_procs;
@@ -614,6 +631,8 @@ string lcs_parallel(string a, string b, int argc, char** argv) {
     
     // Root Process
     if (my_mpi_rank == 0) {
+        cout << "Actual threads: " << provided << endl;
+
         vector<vector<SectionInfo>> sections = produce_sections(a, b, dims);
         // Process first section
         process_section(table, sections[0][0], a, b);
@@ -623,22 +642,32 @@ string lcs_parallel(string a, string b, int argc, char** argv) {
             cout << "Starting diagonal : " << diagonal << endl;
 
             // Distribute sections to worker processes
-            #pragma omp parallel for shared(table, sections, diagonal)
+            // #pragma omp parallel for shared(table, sections, diagonal)
             for (int index = 0; index < (int) sections[diagonal].size(); index++) {
-            
+
                 int rank = index + 1;
                 SectionInfo section = sections[diagonal][index];
+
+                cout << "Sending section: " << section.index << endl;
+ 
+                send_section_info(section, rank);
+                send_top(section, table, rank);
+                send_left(section, table, rank);
             }
 
             // Receive computed solutions from worker processes
-            #pragma omp parallel for shared(table, a, b, sections)
+            // #pragma omp parallel for shared(table, a, b, sections)
             for (int index = 0; index < (int) sections[diagonal].size(); index++) {
 
                 int rank = index + 1; // Recieve from non-zero (non-root) processes
                 SectionInfo section = sections[diagonal][index];
                 int* section_content = receive_section(section, rank);
 
+                cout << "Recieved finished section: " << section.index << endl;
+
                 repopulate(table, section, section_content, a, b);
+
+                // print_table(table, a, b);
             }
         }
 
@@ -665,7 +694,7 @@ string lcs_parallel(string a, string b, int argc, char** argv) {
         while (1) {
             SectionInfo section = receive_info(my_mpi_rank);
 
-            cout << "Received section info: " << my_mpi_rank << endl; 
+            // cout << "Received section info: " << my_mpi_rank << endl; 
 
             // Detect end of computation
             if (section.start_x == -1) {

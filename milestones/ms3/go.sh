@@ -1,20 +1,22 @@
 #!/bin/bash
-#SBATCH −−partition=coursework
-#SBATCH −−job−name=:sad_parrot:
-#SBATCH −−nodes=1
-#SBATCH −−ntasks=4
-#SBATCH −−ntasks−per−node=4
-#SBATCH −−cpus−per−task=4
+#SBATCH --partition=coursework
+#SBATCH --job-name=sadparrot
+#SBATCH --nodes=4
+#SBATCH --ntasks=32
+#SBATCH --ntasks-per-node=8
+#SBATCH --cpus-per-task=2
 
-# export SLURM_JOB_NUM_NODES=2
-# export SLURM_CPUS_ON_NODE=2
-export OMP_NUM_THREADS=4
-# export SLURM_TASKS_PER_NODE=2
-export SLURM_NPROCS=4
+# export SLURM_NNODES=1
+# export SLURM_NTASKS=4
+# export SLURM_TASKS_PER_NODE=4
+# export SLURM_CPUS_PER_TASK=4
+# export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK}
+
+export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK}
 
 DATE=$(date +"%Y%m%d%H%M")
 echo "time started "$DATE
-echo "This is job ’$SLURM_JOB_NAME’ (id: $SLURM_JOB_ID) running on the following nodes:"
+echo "This is job '$SLURM_JOB_NAME' (id: $SLURM_JOB_ID) running on the following nodes:"
 echo $SLURM_NODELIST
 echo "running with OMP_NUM_THREADS= $OMP_NUM_THREADS "
 echo "running with SLURM_TASKS_PER_NODE= $SLURM_TASKS_PER_NODE "
@@ -23,8 +25,10 @@ echo "Now we start the show:"
 export TIMEFORMAT="%E sec"
 
 module load mpi/openmpi-x86_64
-time mpirun -n ${SLURM_NPROCS} ./bin/lcs-hybrid ./test/extra-long.txt ./test/extra-long-p8.out
+time mpirun -n ${SLURM_NPROCS} ./bin/lcs-hybrid ./test/xlong_in.txt ./test/xlong_out.out
 
 DATE=$(date +"%Y%m%d%H%M")
 echo "time finished "$DATE
-# echo "we just ran with the following SLURM environment variables" # env | grep SLURM
+echo "we just ran with the following SLURM environment variables"
+echo $OMP_NUM_THREADS
+env | grep SLURM
