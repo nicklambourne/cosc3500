@@ -639,7 +639,7 @@ string lcs_parallel(string a, string b, int argc, char** argv) {
 
         for (int diagonal = 1; diagonal < (int) sections.size() - 1; diagonal++) {
 
-            cout << "Starting diagonal : " << diagonal << endl;
+            // cout << "Starting diagonal : " << diagonal << endl;
 
             // Distribute sections to worker processes
             // #pragma omp parallel for shared(table, sections, diagonal)
@@ -648,7 +648,7 @@ string lcs_parallel(string a, string b, int argc, char** argv) {
                 int rank = index + 1;
                 SectionInfo section = sections[diagonal][index];
 
-                cout << "Sending section: " << section.index << endl;
+                // cout << "Sending section: " << section.index << endl;
  
                 send_section_info(section, rank);
                 send_top(section, table, rank);
@@ -663,7 +663,7 @@ string lcs_parallel(string a, string b, int argc, char** argv) {
                 SectionInfo section = sections[diagonal][index];
                 int* section_content = receive_section(section, rank);
 
-                cout << "Recieved finished section: " << section.index << endl;
+                // cout << "Recieved finished section: " << section.index << endl;
 
                 repopulate(table, section, section_content, a, b);
 

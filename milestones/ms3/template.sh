@@ -1,15 +1,15 @@
 #!/bin/bash
 #SBATCH --partition=coursework
-#SBATCH --job-name=sadparrot
-#SBATCH --nodes=1
-#SBATCH --ntasks=1
-#SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=16
+#SBATCH --job-name={{name}}
+#SBATCH --nodes={{nnodes}}
+#SBATCH --ntasks={{ntasks}}
+#SBATCH --ntasks-per-node={{ntasks_per_node}}
+#SBATCH --cpus-per-task={{cpus_per_task}}
 
 # export SLURM_NNODES=1
-# export SLURM_NTASKS=1
-# export SLURM_TASKS_PER_NODE=1
-# export SLURM_CPUS_PER_TASK=1
+# export SLURM_NTASKS=4
+# export SLURM_TASKS_PER_NODE=4
+# export SLURM_CPUS_PER_TASK=4
 # export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK}
 
 export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK}
@@ -29,6 +29,6 @@ time mpirun -n ${SLURM_NPROCS} ./bin/lcs-hybrid ./test/xlong_in.txt ./test/xlong
 
 DATE=$(date +"%Y%m%d%H%M")
 echo "time finished "$DATE
-echo "we just ran with the following SLURM environment variables"
+# echo "we just ran with the following SLURM environment variables"
 # echo $OMP_NUM_THREADS
 # env | grep SLURM
