@@ -631,7 +631,7 @@ string lcs_parallel(string a, string b, int argc, char** argv) {
     
     // Root Process
     if (my_mpi_rank == 0) {
-        cout << "Actual threads: " << provided << endl;
+        cout << "Thread Support Level: " << provided << endl;
 
         vector<vector<SectionInfo>> sections = produce_sections(a, b, dims);
         // Process first section

@@ -2,7 +2,7 @@ import subprocess
 import multiprocessing as mp
 import pandas as pd
 from argparse import ArgumentParser
-from os import mkdir, path
+from os import mkdir, path, chdir, getcwd
 from random import choice
 from sys import argv
 from string import ascii_letters, digits, punctuation
@@ -13,58 +13,81 @@ from jinja2 import Environment, FileSystemLoader
 from pathlib import Path
 from itertools import product
 from shutil import rmtree
+from math import log
 
 
-BINARY_PATH = "./bin/lcs"
+BINARY_PATH = path.abspath("./bin/lcs-hybrid")
 AUTO_TEST_PATH = "./auto_test"
-TEST_ROOT = "./test/"
-SLURM_TEMPLATE = "./template.sh"
+INPUT_ROOT = path.abspath("./test")
+TEST_ROOT = path.abspath("./tests/")
+TEMPLATE_ROOT = getcwd()
+SLURM_TEMPLATE = "template.sh"
+INPUT_NAME = "xlong_in.txt"
 
 MAX_NODES = 4
 MAX_TASKS = 64
 MAX_TASKS_PER_NODE = 16
-MAX_CPUS_PER_TASK = 64
+MAX_CPUS_PER_TASK = 16
 MAX_CORES = 64
 
 
 def write_template(output_path: str, template_file: str, context: dict) -> None:
-    j2env = Environment(loader=FileSystemLoader(TEST_ROOT))
+    j2env = Environment(loader=FileSystemLoader(searchpath=TEMPLATE_ROOT))
     template = j2env.get_template(template_file)
     content = template.render(context)
     with open(output_path, "w") as file_:
-        file.write(content)
+        file_.write(content)
 
 
 def b2_options(limit: int) -> List:
-    return list([x ** 2 for x in range(1, limit + 1)])
+    return list([2 ** x for x in range(0, int(log(limit, 2) )+ 1)])
 
 
 class Job():
-    def __init__(nodes: int, 
+    def __init__(self,
+                 nnodes: int, 
                  ntasks: int,
                  ntasks_per_node: int,
                  cpus_per_task: int):
-        self.name = f"{name}-{nnodes}-{ntasks}-{ntasks_per_node}-{cpus_per_task}"
-        self.nnodes = nodes
+        self.name = f"{nnodes}-{ntasks}-{ntasks_per_node}-{cpus_per_task}"
+        self.directory = path.abspath(path.join(TEST_ROOT, self.name))
+        self.script = path.abspath(path.join(self.directory, "go.sh"))
+        self.input = path.abspath(path.join(INPUT_ROOT, INPUT_NAME))
+        self.output = path.abspath(path.join(self.directory, self.name + ".out"))
+        self.binary = BINARY_PATH
+        self.nnodes = nnodes
         self.ntasks = ntasks
         self.ntasks_per_node = ntasks_per_node
         self.cpus_per_task = cpus_per_task
 
-    def generate_script():
-        pass
+    def run(self, n: int):
+        if not path.exists(self.directory):
+            mkdir(self.directory)
 
-    def run(n: int):
-        subprocess.run("sh")
+        context = {key: value for key, value in self.__dict__.items() \
+                    if not key.startswith('__') and not callable(key)}
 
+        write_template(self.script, SLURM_TEMPLATE, context)
+
+        chdir(self.directory)
+
+        for _ in range(n):
+            subprocess.run(["sbatch", self.script])
+
+    def __str__(self) -> str:
+        return repr(self)
+
+    def __repr__(self) -> str:
+        return f"{self.nnodes}-{self.ntasks}-{self.ntasks_per_node}-{self.cpus_per_task}"
 
 def produce_jobs() -> List[Job]:
-    nodes = b2_options(MAX_NODES)
+    nnodes = b2_options(MAX_NODES)
     ntasks = b2_options(MAX_TASKS)
     ntasks_per_node = b2_options(MAX_TASKS_PER_NODE)
     cpus_per_task = b2_options(MAX_CPUS_PER_TASK)
     
-    combinations = product(nodes, ntasks, ntasks_per_node, cpus_per_task)
-    valid_combinations = filter(lambda x: x[0] == x[1] * x[2] and x[1] * x[2] * x[3] <= MAX_CORES,
+    combinations = product(nnodes, ntasks, ntasks_per_node, cpus_per_task)
+    valid_combinations = filter(lambda x: x[1] == x[0] * x[2] and x[1] * x[3] <= MAX_CORES,
                                 combinations)
     
     jobs = list()
@@ -98,5 +121,18 @@ def generate_test_files(num_tests: int,
 
 
 if __name__ == "__main__":
+    if not path.exists(TEST_ROOT):
+        mkdir(TEST_ROOT)
+    
+    if len(argv) != 2:
+        print("Usage: python testing.py <num_tests>")
+        exit()
+
+    parser = ArgumentParser()
+    parser.add_argument("num_tests", type=int, help="Number of tests to run")
+    args = parser.parse_args()
+
     jobs = produce_jobs()
-    print(len(jobs))
+    
+    for job in jobs:
+        job.run(args.num_tests)
