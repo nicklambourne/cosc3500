@@ -5,6 +5,7 @@
 #SBATCH --ntasks={{ntasks}}
 #SBATCH --ntasks-per-node={{ntasks_per_node}}
 #SBATCH --cpus-per-task={{cpus_per_task}}
+#SBATCH --time=1:00:00
 
 export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK}
 export TIMEFORMAT="%E sec"

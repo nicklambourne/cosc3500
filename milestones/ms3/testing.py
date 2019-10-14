@@ -28,7 +28,7 @@ MAX_NODES = 4
 MAX_TASKS = 64
 MAX_TASKS_PER_NODE = 16
 MAX_CPUS_PER_TASK = 16
-MAX_CORES = 64
+MAX_CORES = 16
 
 
 def write_template(output_path: str, template_file: str, context: dict) -> None:
@@ -87,7 +87,8 @@ def produce_jobs() -> List[Job]:
     cpus_per_task = b2_options(MAX_CPUS_PER_TASK)
     
     combinations = product(nnodes, ntasks, ntasks_per_node, cpus_per_task)
-    valid_combinations = filter(lambda x: x[1] == x[0] * x[2] and x[1] * x[3] <= MAX_CORES,
+    valid_combinations = filter(lambda x: x[1] == x[0] * x[2] and 
+                                (x[1] * x[3] <= MAX_CORES or x[3] == 1),
                                 combinations)
     
     jobs = list()
@@ -123,16 +124,24 @@ def generate_test_files(num_tests: int,
 if __name__ == "__main__":
     if not path.exists(TEST_ROOT):
         mkdir(TEST_ROOT)
-    
-    if len(argv) != 2:
-        print("Usage: python testing.py <num_tests>")
-        exit()
 
-    parser = ArgumentParser()
+    parser = ArgumentParser(usage="python -m testing [options] num_tests")
+    parser.add_argument("--dry", "-d", dest="dry", action="store_true", 
+                        help="A dry run will not launch jobs")
     parser.add_argument("num_tests", type=int, help="Number of tests to run")
     args = parser.parse_args()
 
     jobs = produce_jobs()
     
     for job in jobs:
-        job.run(args.num_tests)
+        print(f"{job.name}: ", end="", flush=True)
+        if not args.dry:
+            job.run(args.num_tests)
+        else:
+            print(flush=True)
+
+    if args.dry:
+        print(f"\nEnd dry run of {len(jobs)} jobs")
+    else:
+        print(f"\nEnd run of {len(jobs)} jobs")
+        
