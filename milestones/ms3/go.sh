@@ -2,9 +2,9 @@
 #SBATCH --partition=coursework
 #SBATCH --job-name=sadparrot
 #SBATCH --nodes=1
-#SBATCH --ntasks=1
-#SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=16
+#SBATCH --ntasks=3
+#SBATCH --ntasks-per-node=3
+#SBATCH --cpus-per-task=1
 
 # export SLURM_NNODES=1
 # export SLURM_NTASKS=1

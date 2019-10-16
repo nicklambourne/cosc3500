@@ -1,7 +1,7 @@
 import subprocess
 import multiprocessing as mp
 import pandas as pd
-from argparse import ArgumentParser
+from argparse import ArgumentParser, Namespace
 from os import mkdir, path, chdir, getcwd
 from random import choice
 from sys import argv
@@ -17,7 +17,6 @@ from math import log
 
 
 BINARY_PATH = path.abspath("./bin/lcs-hybrid")
-AUTO_TEST_PATH = "./auto_test"
 INPUT_ROOT = path.abspath("./test")
 TEST_ROOT = path.abspath("./tests/")
 TEMPLATE_ROOT = getcwd()
@@ -121,16 +120,7 @@ def generate_test_files(num_tests: int,
                     f"{random_string(int(i*(max_length/num_tests)))}")
 
 
-if __name__ == "__main__":
-    if not path.exists(TEST_ROOT):
-        mkdir(TEST_ROOT)
-
-    parser = ArgumentParser(usage="python -m testing [options] num_tests")
-    parser.add_argument("--dry", "-d", dest="dry", action="store_true", 
-                        help="A dry run will not launch jobs")
-    parser.add_argument("num_tests", type=int, help="Number of tests to run")
-    args = parser.parse_args()
-
+def run_jobs(args: Namespace) -> None:
     jobs = produce_jobs()
     
     for job in jobs:
@@ -144,4 +134,34 @@ if __name__ == "__main__":
         print(f"\nEnd dry run of {len(jobs)} jobs")
     else:
         print(f"\nEnd run of {len(jobs)} jobs")
-        
+
+
+def run_report(args: Namespace) -> None:
+    pass
+
+
+if __name__ == "__main__":
+    if not path.exists(TEST_ROOT):
+        mkdir(TEST_ROOT)
+
+    master_parser = ArgumentParser(usage="python -m testing <subcommand> [options]")
+
+    subcommand_parser = master_parser.add_subparsers(dest="command")
+    run_parser = subcommand_parser.add_parser("run", help="Run tests using slurm")
+    run_parser.add_argument("--dry", "-d", dest="dry", action="store_true", 
+                        help="A dry run will not launch jobs")
+    run_parser.add_argument("num_tests", type=int, help="Number of tests to run",
+                            required=True)
+    
+    report_parser = subcommand_parser.add_parser("report", help="Produce report from test results")
+    report_parser.add_argument("test_folder", dest="test", required=True 
+                               help="Directory to run reporting on")
+
+    args = master_parser.parse_args()
+
+    if args.command == "run":
+        run_jobs(args)
+    elif args.command == "report":
+        run_report(args)
+    else:
+        pass
