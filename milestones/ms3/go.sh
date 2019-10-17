@@ -29,6 +29,6 @@ time mpirun -n ${SLURM_NPROCS} ./bin/lcs-hybrid ./test/xlong_in.txt ./test/xlong
 
 DATE=$(date +"%Y%m%d%H%M")
 echo "time finished "$DATE
-echo "we just ran with the following SLURM environment variables"
+# echo "we just ran with the following SLURM environment variables"
 # echo $OMP_NUM_THREADS
 # env | grep SLURM
