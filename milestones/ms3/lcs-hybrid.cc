@@ -9,6 +9,10 @@
 
 using namespace std;
 
+#define TOP 1
+#define LEFT 2
+#define INFO 3
+
 
 // Information pertaining to the dimensions and location of a subsection.
 typedef struct {
@@ -385,12 +389,13 @@ void repopulate(vector<vector<int>> &table, SectionInfo info, int* contents,
  * @param rank - the rank sending to
  */
 void send_section_info(SectionInfo section, int rank) {
-    int section_data[5] = {section.start_x, section.end_x, 
-                           section.start_y, section.end_y, section.index};
+    int section_data[6] = {section.start_x, section.end_x, 
+                           section.start_y, section.end_y, 
+                           section.index, section.rank};
     // Send section info
     MPI_Send(
         &section_data,
-        5,
+        6,
         MPI_INT,
         rank,
         0, // Tag
@@ -403,17 +408,18 @@ void send_section_info(SectionInfo section, int rank) {
  * @param table - the master table to retreive data from
  * @param rank - the rank sending to
  */
-void send_top(SectionInfo section, vector<vector<int>> &table, int rank) {
-    // Send top data
+void send_top(SectionInfo section, vector<vector<int>> &table, int rank,
+               MPI_Request request) {
     int* top = get_top(table, section);
     int top_size = (section.end_x - section.start_x + 2);
-    MPI_Send(
+    MPI_Isend(
         top,
         top_size,
         MPI_INT,
         rank,
-        0, // Tag
-        MPI_COMM_WORLD);
+        TOP, // Tag
+        MPI_COMM_WORLD,
+        &request);
 }
 
 /**
@@ -422,18 +428,19 @@ void send_top(SectionInfo section, vector<vector<int>> &table, int rank) {
  * @param table - the master table to retreive data from
  * @param rank - the rank sending to
  */
-void send_left(SectionInfo section, vector<vector<int>> &table, int rank) {
+void send_left(SectionInfo section, vector<vector<int>> &table, int rank,
+               MPI_Request request) {
     int* left = get_left(table, section);
     int left_size = (section.end_y - section.start_y + 1);
-    
-    // Send left data
-    MPI_Send(
+
+    MPI_Isend(
         left,
         left_size,
         MPI_INT,
         rank,
-        0, // Tag
-        MPI_COMM_WORLD);
+        LEFT, // Tag
+        MPI_COMM_WORLD,
+        &request);
 }
 
 /**
@@ -441,11 +448,11 @@ void send_left(SectionInfo section, vector<vector<int>> &table, int rank) {
  * @param rank - the rank to send the close information to.
  */
 void send_close(int rank) {
-    int close_data[4] = {-1, -1, -1, -1};
+    int close_data[6] = {-1, -1, -1, -1, -1, -1};
     // Send close
     MPI_Send(
         &close_data,
-        4,
+        6,
         MPI_INT,
         rank, // Destination
         0,    // Tag
@@ -498,14 +505,14 @@ int* receive_section(SectionInfo section, int rank) {
  *               (based on info received in receive_info)
  * @return - a one-dimensional array containing the border information
  */
-int* receive_border(int size) {
+int* receive_border(int size, int tag) {
     int* border = (int*) malloc(sizeof(int) * size);
     MPI_Recv(
         border,
         size,
         MPI_INT,
         0,
-        0,
+        tag,
         MPI_COMM_WORLD,
         MPI_STATUS_IGNORE);
     return border;
@@ -518,10 +525,10 @@ int* receive_border(int size) {
  * @return - a populated SectionInfo instance with the received information
  */
 SectionInfo receive_info(int rank) {
-    int section[5];
+    int section[6];
     MPI_Recv(
         &section,
-        5,
+        6,
         MPI_INT,
         0,
         0,
@@ -640,31 +647,33 @@ string lcs_parallel(string a, string b, int argc, char** argv) {
 
         for (int diagonal = 1; diagonal < (int) sections.size() - 1; diagonal++) {
 
-            // cout << "Starting diagonal : " << diagonal << endl;
+            cout << "Starting diagonal : " << diagonal << endl;
+
+            int diagonal_size = sections[diagonal].size();
+            MPI_Request send_top_req[diagonal_size];
+            MPI_Request send_left_req[diagonal_size];
 
             // Distribute sections to worker processes
-            // #pragma omp parallel for shared(table, sections, diagonal)
             for (int index = 0; index < (int) sections[diagonal].size(); index++) {
 
                 int rank = index + 1;
                 SectionInfo section = sections[diagonal][index];
 
-                // cout << "Sending section: " << section.index << endl;
+                cout << "Sending section: " << section.index << endl;
  
                 send_section_info(section, rank);
-                send_top(section, table, rank);
-                send_left(section, table, rank);
+                send_top(section, table, rank, send_top_req[index]);
+                send_left(section, table, rank, send_left_req[index]);
             }
 
             // Receive computed solutions from worker processes
-            // #pragma omp parallel for shared(table, a, b, sections)
             for (int index = 0; index < (int) sections[diagonal].size(); index++) {
 
                 int rank = index + 1; // Recieve from non-zero (non-root) processes
                 SectionInfo section = sections[diagonal][index];
                 int* section_content = receive_section(section, rank);
 
-                // cout << "Recieved finished section: " << section.index << endl;
+                cout << "Recieved finished section: " << section.index << endl;
 
                 repopulate(table, section, section_content, a, b);
 
@@ -706,8 +715,8 @@ string lcs_parallel(string a, string b, int argc, char** argv) {
             int section_height = section.end_y - section.start_y + 1;
             int section_width = section.end_x - section.start_x + 1;
 
-            int* top = receive_border(section_width + 1);
-            int* left = receive_border(section_height);
+            int* top = receive_border(section_width + 1, TOP);
+            int* left = receive_border(section_height, LEFT);
 
             int* result = process_worker_section(section, a, b, top, left, section_height, section_width);
 
