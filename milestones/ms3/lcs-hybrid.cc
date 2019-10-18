@@ -29,13 +29,24 @@ typedef struct {
  * zeros.
  * @param height - target height of table
  * @param width - target width of table
- * @return - two-dimensional vector (table)
+ * @return - two-dimensional array (table)
 */
 vector<vector<int>> construct_table(int height, int width) {
-    vector<vector<int>> table (
-        height,
-        vector<int> (width, 0)        
+    // int** table = malloc(sizeof(int*) * height);
+    // for (int y = 0; y < height; y++) {
+    //     table[y] = new int[width];
+    // }
+    vector<vector<int>> table = *new vector<vector<int>> (height, 
+        *new vector<int>(width, 0)
     );
+    // for (int y = 0; y < height; y++) {
+    //     vector<int> *row = new vector<int>(width, 0);
+    //     cout << "Row size: " << (*row).size() << endl;
+    //     (*table).push_back(*row);
+    // }
+
+    cout << "Size: (" << table[0].size() <<  ", " << table.size() << ")" << endl;
+
     return table;
 }
 
@@ -408,18 +419,18 @@ void send_section_info(SectionInfo section, int rank) {
  * @param table - the master table to retreive data from
  * @param rank - the rank sending to
  */
-void send_top(SectionInfo section, vector<vector<int>> &table, int rank,
-               MPI_Request request) {
+void send_top(SectionInfo section, vector<vector<int>> &table, int rank) {
     int* top = get_top(table, section);
     int top_size = (section.end_x - section.start_x + 2);
-    MPI_Isend(
+    MPI_Send(
         top,
         top_size,
         MPI_INT,
         rank,
         TOP, // Tag
-        MPI_COMM_WORLD,
-        &request);
+        MPI_COMM_WORLD);
+    
+    free(top);
 }
 
 /**
@@ -428,19 +439,19 @@ void send_top(SectionInfo section, vector<vector<int>> &table, int rank,
  * @param table - the master table to retreive data from
  * @param rank - the rank sending to
  */
-void send_left(SectionInfo section, vector<vector<int>> &table, int rank,
-               MPI_Request request) {
+void send_left(SectionInfo section, vector<vector<int>> &table, int rank) {
     int* left = get_left(table, section);
     int left_size = (section.end_y - section.start_y + 1);
 
-    MPI_Isend(
+    MPI_Send(
         left,
         left_size,
         MPI_INT,
         rank,
         LEFT, // Tag
-        MPI_COMM_WORLD,
-        &request);
+        MPI_COMM_WORLD);
+
+    free(left);
 }
 
 /**
@@ -582,6 +593,8 @@ void process_section(vector<vector<int>> &table, SectionInfo info, string a,
     int* result = extract_solution(section_table);
 
     repopulate(table, info, result, a, b);
+
+    free(result);
 }
 
 /**
@@ -650,11 +663,9 @@ string lcs_parallel(string a, string b, int argc, char** argv) {
             cout << "Starting diagonal : " << diagonal << endl;
 
             int diagonal_size = sections[diagonal].size();
-            MPI_Request send_top_req[diagonal_size];
-            MPI_Request send_left_req[diagonal_size];
 
             // Distribute sections to worker processes
-            for (int index = 0; index < (int) sections[diagonal].size(); index++) {
+            for (int index = 0; index < diagonal_size; index++) {
 
                 int rank = index + 1;
                 SectionInfo section = sections[diagonal][index];
@@ -662,12 +673,12 @@ string lcs_parallel(string a, string b, int argc, char** argv) {
                 cout << "Sending section: " << section.index << endl;
  
                 send_section_info(section, rank);
-                send_top(section, table, rank, send_top_req[index]);
-                send_left(section, table, rank, send_left_req[index]);
+                send_top(section, table, rank);
+                send_left(section, table, rank);
             }
 
             // Receive computed solutions from worker processes
-            for (int index = 0; index < (int) sections[diagonal].size(); index++) {
+            for (int index = 0; index < diagonal_size; index++) {
 
                 int rank = index + 1; // Recieve from non-zero (non-root) processes
                 SectionInfo section = sections[diagonal][index];
@@ -677,6 +688,7 @@ string lcs_parallel(string a, string b, int argc, char** argv) {
 
                 repopulate(table, section, section_content, a, b);
 
+                free(section_content);
                 // print_table(table, a, b);
             }
         }
@@ -723,6 +735,10 @@ string lcs_parallel(string a, string b, int argc, char** argv) {
             int size = section_height * section_width;
 
             send_section(result, size);
+
+            free(top);
+            free(left);
+            free(result);
         }
         
     }
