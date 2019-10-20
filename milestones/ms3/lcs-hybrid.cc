@@ -234,11 +234,6 @@ int* get_top(int** table, SectionInfo info) {
 
     if (!(info.start_y == 0)) {
         for (int i = 1, x_index = 0; i < top_size; i++, x_index++) {
-            if (info.index == 465) {
-                cout << "i=" << i << ", x=" << x_index << endl;
-                cout << "size: " << top_size << endl;
-                cout << "yco:" << info.start_y - 1 << ", xco" << info.start_x + x_index << endl;
-            }
             top[i] = table[info.start_y - 1][info.start_x + x_index];
         }
     }
@@ -437,8 +432,8 @@ void send_section_info(SectionInfo section, int rank) {
  */
 void send_top(SectionInfo section, int** table, int rank) {
     int* top = get_top(table, section);
-    cout << "AAAAAAA" << endl;
     int top_size = (section.end_x - section.start_x + 2);
+
     MPI_Send(
         top,
         top_size,
@@ -698,13 +693,10 @@ string lcs_parallel(string a, string b, int argc, char** argv) {
                 int rank = index + 1;
                 SectionInfo section = sections[diagonal][index];
 
-                
-
-                cout << print_section(section) << endl;
+                // cout << "Sending section: " << section.index << endl;
  
                 send_section_info(section, rank);
                 send_top(section, table, rank);
-                cout << "Sending section: " << section.index << endl;
                 send_left(section, table, rank);
 
             }
@@ -716,7 +708,7 @@ string lcs_parallel(string a, string b, int argc, char** argv) {
                 SectionInfo section = sections[diagonal][index];
                 int* section_content = receive_section(section, rank);
 
-                cout << "Recieved finished section: " << section.index << endl;
+                // cout << "Recieved finished section: " << section.index << endl;
 
                 repopulate(table, section, section_content, a, b);
 
