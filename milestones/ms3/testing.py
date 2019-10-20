@@ -13,7 +13,7 @@ from jinja2 import Environment, FileSystemLoader
 from pathlib import Path
 from itertools import product
 from shutil import rmtree
-from math import log
+from math import ceil, log
 
 
 BINARY_PATH = path.abspath("./bin/lcs-hybrid")
@@ -27,7 +27,7 @@ MAX_NODES = 4
 MAX_TASKS = 64
 MAX_TASKS_PER_NODE = 16
 MAX_CPUS_PER_TASK = 16
-MAX_CORES = 16
+MAX_CORES_PER_NODE = 16
 
 
 def write_template(output_path: str, template_file: str, context: dict) -> None:
@@ -47,12 +47,14 @@ class Job():
                  nnodes: int, 
                  ntasks: int,
                  ntasks_per_node: int,
-                 cpus_per_task: int):
+                 cpus_per_task: int,
+                 input_file: str = path.abspath(path.join(INPUT_ROOT, INPUT_NAME)),
+                 output_file: str = None):
         self.name = f"{nnodes}-{ntasks}-{ntasks_per_node}-{cpus_per_task}"
         self.directory = path.abspath(path.join(TEST_ROOT, self.name))
         self.script = path.abspath(path.join(self.directory, "go.sh"))
-        self.input = path.abspath(path.join(INPUT_ROOT, INPUT_NAME))
-        self.output = path.abspath(path.join(self.directory, self.name + ".out"))
+        self.input = input_file
+        self.output = output_file if output_file else path.abspath(path.join(self.directory, self.name + ".out"))
         self.binary = BINARY_PATH
         self.nnodes = nnodes
         self.ntasks = ntasks
@@ -77,9 +79,9 @@ class Job():
         return repr(self)
 
     def __repr__(self) -> str:
-        return f"{self.nnodes}-{self.ntasks}-{self.ntasks_per_node}-{self.cpus_per_task}"
+        return f"{self.nnodes}-{self.ntasks}-{self.ntasks_per_node}-{self.cpus_per_task}-{self.input}"
 
-def produce_jobs() -> List[Job]:
+def produce_strong_jobs() -> List[Job]:
     nnodes = b2_options(MAX_NODES)
     ntasks = b2_options(MAX_TASKS)
     ntasks_per_node = b2_options(MAX_TASKS_PER_NODE)
@@ -87,7 +89,7 @@ def produce_jobs() -> List[Job]:
     
     combinations = product(nnodes, ntasks, ntasks_per_node, cpus_per_task)
     valid_combinations = filter(lambda x: x[1] == x[0] * x[2] and 
-                                (x[1] * x[3] <= MAX_CORES or x[3] == 1),
+                                (x[1] * x[3] <= MAX_CORES_PER_NODE or x[3] == 1),
                                 combinations)
     
     jobs = list()
@@ -102,11 +104,35 @@ def produce_jobs() -> List[Job]:
 
 
 def random_string(length: int) -> str:
-    return "".join(choice(ascii_letters+digits+punctuation) for i in range(length))
+    return "".join(choice(ascii_letters+digits) for i in range(length))
 
 
-def run_single_test() -> None:
-    pass
+def write_weak_file(test_string_a: str, test_string_b: str, length: int):
+    with open(f"{INPUT_ROOT}/{length}.in", "w") as input_file:
+        input_file.write(f"{test_string_a[:length]}\n"
+                            f"{test_string_b[:length]}")
+
+
+
+def produce_weak_jobs() -> List[Job]:
+    increments = [10, 100, 1000]
+    test_string_a = random_string(MAX_TASKS * max(increments))
+    test_string_b = random_string(MAX_TASKS * max(increments))
+    
+    jobs = list()
+
+    for increment in increments:
+        for ntasks in b2_options(MAX_TASKS):
+            length = increment * ntasks
+            write_weak_file(test_string_a, test_string_b, length)
+            nnodes = ceil(ntasks / MAX_TASKS_PER_NODE)
+            ntasks_per_node = ntasks if ntasks <= MAX_TASKS_PER_NODE else int(ntasks / nnodes)
+            cpus_per_task = 1
+            job = Job(nnodes, ntasks, ntasks_per_node, cpus_per_task, 
+                      f"{INPUT_ROOT}/{length}.in", f"{INPUT_ROOT}/{length}.out")
+            jobs.append(job)
+    
+    return jobs
 
 
 def generate_test_files(num_tests: int,
@@ -121,7 +147,11 @@ def generate_test_files(num_tests: int,
 
 
 def run_jobs(args: Namespace) -> None:
-    jobs = produce_jobs()
+    jobs = None
+    if args.test_type == "strong":
+        jobs = produce_strong_jobs()
+    elif args.test_type == "weak":
+        jobs = produce_weak_jobs()
     
     for job in jobs:
         print(f"{job.name}: ", end="", flush=True)
@@ -148,14 +178,14 @@ if __name__ == "__main__":
 
     subcommand_parser = master_parser.add_subparsers(dest="command")
     run_parser = subcommand_parser.add_parser("run", help="Run tests using slurm")
-    run_parser.add_argument("--dry", "-d", dest="dry", action="store_true", 
-                        help="A dry run will not launch jobs")
-    run_parser.add_argument("num_tests", type=int, help="Number of tests to run",
-                            required=True)
+    run_parser.add_argument("--dry", dest="dry", action="store_true", 
+                            help="A dry run will not launch jobs")
+    run_parser.add_argument("test_type", choices=["strong", "weak"],
+                            help="Whether to run tests for strong or weak scaling")
+    run_parser.add_argument("num_tests", type=int, help="Number of tests to run")
     
     report_parser = subcommand_parser.add_parser("report", help="Produce report from test results")
-    report_parser.add_argument("test_folder", dest="test", required=True 
-                               help="Directory to run reporting on")
+    report_parser.add_argument("test_folder", help="Directory to run reporting on")
 
     args = master_parser.parse_args()
 

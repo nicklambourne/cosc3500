@@ -1,9 +1,9 @@
 #!/bin/bash
 #SBATCH --partition=coursework
 #SBATCH --job-name=sadparrot
-#SBATCH --nodes=1
-#SBATCH --ntasks=1
-#SBATCH --ntasks-per-node=1
+#SBATCH --nodes=2
+#SBATCH --ntasks=32
+#SBATCH --ntasks-per-node=16
 #SBATCH --cpus-per-task=1
 
 # export SLURM_NNODES=1
@@ -25,7 +25,7 @@ echo "Now we start the show:"
 export TIMEFORMAT="%E sec"
 
 module load mpi/openmpi-x86_64
-time mpirun -n ${SLURM_NPROCS} ./bin/lcs-hybrid ./test/sizeable_in.txt ./test/sizeable_out.out
+time mpirun -n ${SLURM_NPROCS} ./bin/lcs-hybrid ./test/320.in ./test/320_.out
 
 DATE=$(date +"%Y%m%d%H%M")
 echo "time finished "$DATE

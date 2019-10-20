@@ -2,10 +2,11 @@
 #include <stdio.h>
 #include <fstream>
 #include <vector>
-#include<string>
-#include<iostream> 
-#include<algorithm> 
+#include <string>
+#include <iostream> 
+#include <algorithm> 
 #include <math.h>
+#include <sstream>
 
 using namespace std;
 
@@ -25,29 +26,30 @@ typedef struct {
 } SectionInfo;
 
 /**
- * Creates a two dimentional vector of specified size and populates it with
+ * Creates a two dimentional array of the specified size and populates it with
  * zeros.
  * @param height - target height of table
  * @param width - target width of table
  * @return - two-dimensional array (table)
 */
-vector<vector<int>> construct_table(int height, int width) {
-    // int** table = malloc(sizeof(int*) * height);
-    // for (int y = 0; y < height; y++) {
-    //     table[y] = new int[width];
-    // }
-    vector<vector<int>> table = *new vector<vector<int>> (height, 
-        *new vector<int>(width, 0)
-    );
-    // for (int y = 0; y < height; y++) {
-    //     vector<int> *row = new vector<int>(width, 0);
-    //     cout << "Row size: " << (*row).size() << endl;
-    //     (*table).push_back(*row);
-    // }
-
-    cout << "Size: (" << table[0].size() <<  ", " << table.size() << ")" << endl;
-
+int** construct_table(int height, int width) {    
+    int** table = (int**) malloc(sizeof(int*) * height);
+    for (int y = 0; y < height; y++) {
+        table[y] = (int*) calloc(width, sizeof(int));
+    }
     return table;
+}
+
+/**
+ * Frees the memory associated with a table.
+ * @param table - 2-dimensional array of integers to free
+ * @param rows - height of the table
+ */
+void free_table(int** table, int rows) {
+    for (int i = 0; i < rows; i++) {
+        free(table[i]);
+    }
+    free(table);
 }
 
 /** 
@@ -67,11 +69,11 @@ string pad(string contents, int length) {
 /**
  * Prints the given table to stdout with row/col indexes and relevant
  * letters of each string.
- * @param table - the two-dimensional vector to print
+ * @param table - the two-dimensional array to print
  * @param a - the string represented on the vertical axis
  * @param b - the string represented on the horizontal axis
  */
-void print_table(vector<vector<int>> &table, string a, string b) {
+void print_table(int** table, string a, string b) {
     cout << "     ";
     for (int i = 0; i < (int) b.length(); i++) {
         cout << pad(to_string(i), 3);
@@ -81,9 +83,9 @@ void print_table(vector<vector<int>> &table, string a, string b) {
         cout << pad(b.substr(i, 1), 3);
     }
     cout << endl;
-    for (int y = 0; y < (int) table.size(); y++) {
+    for (int y = 0; y < (int) a.length(); y++) {
         cout << pad(to_string(y), 3) << " " << a.substr(y, 1);
-        for (int x = 0; x < (int) table[y].size(); x++) {
+        for (int x = 0; x < (int) b.length(); x++) {
             cout << pad(to_string(table[y][x]), 3);
         }
         cout << endl;
@@ -137,7 +139,7 @@ int get_y(int index, int height) {
  * @return - the value of the cell to the top left of the given coordinates
  *           or 0, if unreachable.
  */
-int get_top_left(vector<vector<int>> &table, int x, int y, int* top, int* left) {
+int get_top_left(int** table, int x, int y, int* top, int* left) {
     if (y == 0) {
         return top[x];
     }
@@ -161,7 +163,7 @@ int get_top_left(vector<vector<int>> &table, int x, int y, int* top, int* left) 
  * @param left - the column of values to the left of the specified coordinates
  * @return - the calculated value to populate the target cell with
  */
-int calculate_cell(vector<vector<int>> &table, int x, int y,
+int calculate_cell(int** table, int x, int y,
                    string a, string b, int* top, int* left) {
     int left_cell = x > 0 && y >= 0 ? table[y][x - 1] : left[y];
     int top_cell = x >= 0 && y > 0 ? table[y - 1][x] : top[x+1];
@@ -183,7 +185,7 @@ int calculate_cell(vector<vector<int>> &table, int x, int y,
  * @param left - the column of values to the left of the specified coordinates.
  * 
  */
-void diagonal_lcs(vector<vector<int>> &table, string a, string b, 
+void diagonal_lcs(int** table, string a, string b, 
                   int* top, int* left) {
     int height = a.length();
     int width = b.length();
@@ -220,7 +222,7 @@ void diagonal_lcs(vector<vector<int>> &table, string a, string b,
  * @return - a one-dimensional array of the data for the row to the top of the
  *           section.
  */
-int* get_top(vector<vector<int>> &table, SectionInfo info) {
+int* get_top(int** table, SectionInfo info) {
     int top_size = info.end_x - info.start_x + 2;
     int* top = (int*) calloc(top_size, sizeof(int));
 
@@ -232,6 +234,11 @@ int* get_top(vector<vector<int>> &table, SectionInfo info) {
 
     if (!(info.start_y == 0)) {
         for (int i = 1, x_index = 0; i < top_size; i++, x_index++) {
+            if (info.index == 465) {
+                cout << "i=" << i << ", x=" << x_index << endl;
+                cout << "size: " << top_size << endl;
+                cout << "yco:" << info.start_y - 1 << ", xco" << info.start_x + x_index << endl;
+            }
             top[i] = table[info.start_y - 1][info.start_x + x_index];
         }
     }
@@ -246,7 +253,7 @@ int* get_top(vector<vector<int>> &table, SectionInfo info) {
  * @return - a one-dimensional array of the data for the row to the top of the
  *           section.
  */
-int* get_left(vector<vector<int>> &table, SectionInfo info) {
+int* get_left(int** table, SectionInfo info) {
     int left_size = info.end_y - info.start_y + 1;
     int* left = (int*) calloc(left_size, sizeof(int));
     if (!(info.start_x == 0)) {
@@ -259,15 +266,17 @@ int* get_left(vector<vector<int>> &table, SectionInfo info) {
 
 /**
  * Transfers the contents of a table to a one-dimensional array.
- * @param table - a two-dimensional vector to extract the data from
+ * @param table - a two-dimensional array to extract the data from
+ * @param a - string represented on the vertical axis
+ * @param b - string represented on the horizontal axis
  * @return a one-dimentional array the data has been written to
  */
-int* extract_solution(vector<vector<int>> &table) {
-    int size = (table.size() * table[0].size());
+int* extract_solution(int** table, string a, string b) {
+    int size = (a.length() * b.length());
     int* single_dim = (int*) malloc(sizeof(int) * size);
     int index = 0;
-    for (int y = 0; y < (int) table.size(); y++) {
-        for (int x = 0; x < (int) table[y].size(); x++, index++) {
+    for (int y = 0; y < (int) a.size(); y++) {
+        for (int x = 0; x < (int) b.size(); x++, index++) {
             single_dim[index] = table[y][x];
         }
     }
@@ -306,7 +315,14 @@ vector<int> get_mpi_dimensions(int num_procs, string a, string b) {
 }
 
 /**
- * 
+ * Creates the set of sections describing the sections of the table to
+ * be processed by worker processes. 
+ * @param a - the string represented on the y-axis.
+ * @param b - the string represented on the x-axis.
+ * @param mpi_dims - 2-element vector describing the number of sections
+ *                   for the table to be broken up into (y, x).
+ * @return - two-dimensional vector of SectionInfo objects describing sections
+ *           to be processed by workers.
  */
 vector<vector<SectionInfo>> produce_sections(string a, string b, vector<int> mpi_dims) {
     int cell_width = mpi_dims[1];
@@ -325,8 +341,8 @@ vector<vector<SectionInfo>> produce_sections(string a, string b, vector<int> mpi
             SectionInfo info;
             info.rank = i == 0 ? 0 : rank;
             info.index = index;
-            info.start_x = max(0, x * norm_width);
-            info.start_y = max(0, y * norm_height);
+            info.start_x = min(total_width, x * norm_width);
+            info.start_y = min(total_height, y * norm_height);
             info.end_x = min((x + 1) * norm_width - 1, total_width - 1);
             info.end_y = min((y + 1) * norm_height - 1, total_height - 1);
             diagonal.push_back(info);
@@ -351,7 +367,7 @@ void reverse_string(string& x) {
  * @param b - the string represented on the table's x-axis
  * @return - the LCS string
  */
-string reconstruct_lcs(vector<vector<int>> &table, string a, string b) {
+string reconstruct_lcs(int** table, string a, string b) {
     string lcs = "";
     int y = a.length() - 1;
     int x = b.length() - 1;
@@ -384,7 +400,7 @@ string reconstruct_lcs(vector<vector<int>> &table, string a, string b) {
  * @param a - the string represented on the vertical axis
  * @param b - the string represented on the horizontal axis
  */
-void repopulate(vector<vector<int>> &table, SectionInfo info, int* contents,
+void repopulate(int** table, SectionInfo info, int* contents,
                 string a, string b) {
     for (int y = info.start_y, index = 0; y <= info.end_y; y++) {
         for (int x = info.start_x; x <= info.end_x; x++, index++) {
@@ -419,8 +435,9 @@ void send_section_info(SectionInfo section, int rank) {
  * @param table - the master table to retreive data from
  * @param rank - the rank sending to
  */
-void send_top(SectionInfo section, vector<vector<int>> &table, int rank) {
+void send_top(SectionInfo section, int** table, int rank) {
     int* top = get_top(table, section);
+    cout << "AAAAAAA" << endl;
     int top_size = (section.end_x - section.start_x + 2);
     MPI_Send(
         top,
@@ -439,7 +456,7 @@ void send_top(SectionInfo section, vector<vector<int>> &table, int rank) {
  * @param table - the master table to retreive data from
  * @param rank - the rank sending to
  */
-void send_left(SectionInfo section, vector<vector<int>> &table, int rank) {
+void send_left(SectionInfo section, int** table, int rank) {
     int* left = get_left(table, section);
     int left_size = (section.end_y - section.start_y + 1);
 
@@ -563,7 +580,7 @@ SectionInfo receive_info(int rank) {
  * instance.
  * Relies on having access to root-process-only information (e.g. the full 
  * table).
- * @param table - a two-dimensional vector which represents the (sub-) section
+ * @param table - a two-dimensional array which represents the (sub-) section
  *                to calculate
  * @param info - the SectionInfo instance that defines the boundaries of the 
  *               section.
@@ -573,7 +590,7 @@ SectionInfo receive_info(int rank) {
  * @param left - the column of values to the left of the specified coordinates
  * @return - the calculated value to populate the target cell with
  */
-void process_section(vector<vector<int>> &table, SectionInfo info, string a, 
+void process_section(int** table, SectionInfo info, string a, 
                      string b) {
     int top_size = (info.end_x - info.start_x + 2);
     int left_size = (info.end_y - info.start_y + 1);
@@ -583,17 +600,20 @@ void process_section(vector<vector<int>> &table, SectionInfo info, string a,
     string b_sub = b.substr(info.start_x, end_b);
     int* top = get_top(table, info);
     int* left = get_left(table, info);
-    vector<vector<int>> section_table = construct_table(a_sub.length(), 
-                                                        b_sub.length());
+    int** section_table = construct_table(a_sub.length(), 
+                                          b_sub.length());
 
     diagonal_lcs(section_table, a_sub, b_sub, top, left);
 
     // print_table(section_table, a_sub, b_sub);
 
-    int* result = extract_solution(section_table);
+    int* result = extract_solution(section_table, a_sub, b_sub);
 
     repopulate(table, info, result, a, b);
 
+    free(top);
+    free(left);
+    free_table(section_table, a_sub.length());
     free(result);
 }
 
@@ -616,14 +636,20 @@ int* process_worker_section(SectionInfo info, string a, string b, int* top,
     string a_sub = a.substr(info.start_y, section_height);
     string b_sub = b.substr(info.start_x, section_width);
 
-    vector<vector<int>> section_table = construct_table(section_height, 
-                                                        section_width);
+    int** section_table = construct_table(section_height, section_width);
 
     diagonal_lcs(section_table, a_sub, b_sub, top, left);
 
     // print_table(section_table, a_sub, b_sub);
 
-    return extract_solution(section_table);
+    return extract_solution(section_table, a_sub, b_sub);
+}
+
+string print_section(SectionInfo info) {
+    ostringstream stream;
+    stream << "(" << info.start_x << ", " << info.end_x << ", " << info.start_y <<
+         ", " << info.end_y << ")" << endl;
+    return stream.str();
 }
 
 /**
@@ -644,15 +670,17 @@ string lcs_parallel(string a, string b, int argc, char** argv) {
 
     int num_procs;
     MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
-    vector<int> dims = get_mpi_dimensions(num_procs, a, b);
+    
     int my_mpi_rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &my_mpi_rank);
-    vector<vector<int>> table = construct_table(a.length(), b.length());
     
     // Root Process
     if (my_mpi_rank == 0) {
-        cout << "Required Thread Support Level: " << MPI_THREAD_MULTIPLE << endl;
-        cout << "Actual Thread Support Level: " << provided << endl;
+        vector<int> dims = get_mpi_dimensions(num_procs, a, b);
+
+        cout << "(" << b.length() << ", " << b.length() << ")" << endl;
+
+        int** table = construct_table(a.length(), b.length());
 
         vector<vector<SectionInfo>> sections = produce_sections(a, b, dims);
         // Process first section
@@ -660,7 +688,7 @@ string lcs_parallel(string a, string b, int argc, char** argv) {
 
         for (int diagonal = 1; diagonal < (int) sections.size() - 1; diagonal++) {
 
-            cout << "Starting diagonal : " << diagonal << endl;
+            // cout << "Starting diagonal : " << diagonal << endl;
 
             int diagonal_size = sections[diagonal].size();
 
@@ -670,11 +698,15 @@ string lcs_parallel(string a, string b, int argc, char** argv) {
                 int rank = index + 1;
                 SectionInfo section = sections[diagonal][index];
 
-                cout << "Sending section: " << section.index << endl;
+                
+
+                cout << print_section(section) << endl;
  
                 send_section_info(section, rank);
                 send_top(section, table, rank);
+                cout << "Sending section: " << section.index << endl;
                 send_left(section, table, rank);
+
             }
 
             // Receive computed solutions from worker processes

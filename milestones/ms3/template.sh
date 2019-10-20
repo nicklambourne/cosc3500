@@ -10,6 +10,8 @@
 export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK}
 export TIMEFORMAT="%E sec"
 
+echo "{{name}} - {{input}}"
+
 module load mpi/openmpi-x86_64
 time mpirun -n ${SLURM_NPROCS} {{binary}} {{input}} {{output}}
 
