@@ -23,7 +23,7 @@ INPUT_ROOT = path.abspath("./test")
 TEST_ROOT = path.abspath("./tests/")
 TEMPLATE_ROOT = getcwd()
 SLURM_TEMPLATE = "template.sh"
-INPUT_FILE_NAME = "test_in.txt"
+INPUT_FILE_NAME = path.abspath(f"./{str(uuid4())}.txt")
 
 MAX_NODES = 4
 MAX_TASKS = 64
@@ -83,6 +83,7 @@ class Job():
     def __repr__(self) -> str:
         return f"{self.nnodes}-{self.ntasks}-{self.ntasks_per_node}-{self.cpus_per_task}-{self.input}"
 
+
 def produce_strong_jobs(args: Namespace) -> List[Job]:
     with open(INPUT_FILE_NAME, "w") as input_file:
         input_file.write(f"{random_string(args.input_size)}\n"
@@ -115,7 +116,7 @@ def random_string(length: int) -> str:
     return "".join(choice(ascii_letters+digits) for i in range(length))
 
 
-def write_weak_file(test_string_a: str, test_string_b: str, length: int):
+def write_weak_file(test_string_a: str, test_string_b: str, length: int) -> None:
     with open(f"{INPUT_ROOT}/{length}.in", "w") as input_file:
         input_file.write(f"{test_string_a[:length]}\n"
                             f"{test_string_b[:length]}")
@@ -171,7 +172,7 @@ def run_report(args: Namespace) -> None:
 
     for result in results:
         with open(result, "r") as result_file:
-            try: 
+            try:  # this allows us to run over a running directory and skip malformed files
                 settings_line = result_file.readline()
                 setting_components = settings_line.split(" ")[0].split("-")
                 nnodes = int(setting_components[0])
@@ -193,36 +194,52 @@ def run_report(args: Namespace) -> None:
                 pass
     
     dataframe = pd.DataFrame(columns=["nnodes", "ntasks", "ntasks_per_node", 
-                                     "cpus_per_task", "problem_size", "magnitude",
-                                     "run_time"],
+                                      "cpus_per_task", "problem_size", "magnitude",
+                                      "run_time"],
                             data=findings)
         
-    dataframe = dataframe.groupby(["nnodes", "ntasks", "ntasks_per_node", 
-                        "cpus_per_task", "problem_size", "magnitude"]).mean()
+    dataframe = dataframe.sort_values(["nnodes", "ntasks", "cpus_per_task"])
 
-    dataframe = dataframe.sort_values(["magnitude", "ntasks"])
+    if args.test_type == "strong": 
+        report_dataframe = dataframe.groupby(["nnodes", "ntasks", "ntasks_per_node", "cpus_per_task"]).mean()
+        report_dataframe.to_csv(f"{args.test_type}.csv")
+        dataframe = dataframe.groupby(["ntasks", "cpus_per_task"]).mean()
+        print(report_dataframe)
+        
+        
+    elif args.test_type == "weak": 
+        dataframe = dataframe.groupby(["nnodes", "ntasks", "ntasks_per_node", 
+                        "cpus_per_task", "problem_size", "magnitude"]).mean()
+        dataframe = dataframe.sort_values(["magnitude", "ntasks"])
 
     dataframe.reset_index(inplace=True)
 
-    dataframe.to_csv(f"{args.test_type}.csv")
-
     figure, axis = plt.subplots()
-
+    
     if args.test_type == "weak":
         for key, group in dataframe.groupby("magnitude"):
             magnitude = group.magnitude.unique()[0]
-            axis = group.plot(kind="line", x="ntasks", y="run_time", label=key)
+            axis = group.plot(kind="line", x="ntasks", y="run_time", label=key, linestyle="-", marker="o")
             plt.legend(title="Size/Processing Unit", loc="best")
+            axis.set_ylabel("Wall Time (s)")
+            axis.set_xlabel("MPI Process Count (ntasks)")
             plt.savefig(f"weak-{magnitude}.png")
+        dataframe.to_csv(f"{args.test_type}.csv")
+        print(dataframe)
 
     elif args.test_type == "strong":
+        dataframe = dataframe.sort_values(["ntasks", "cpus_per_task"])
+        index = 0
+        colours = ["red", "blue", "orange", "green", "purple"]
+        plt.xscale('log', basex=2)
         for key, group in dataframe.groupby("cpus_per_task"):
-            axis = group.plot(ax=axis, kind="line", x="ntasks", y="run_time", label=key)
+            axis = group.plot(ax=axis, kind="line", x="ntasks", y="run_time", label=key, c=colours[index], linestyle="-", marker="o")
+            index += 1
         plt.legend(title="Thread Count", loc="best")
+        axis.set_ylabel("Wall Time (s)")
+        axis.set_xlabel("MPI Process Count (ntasks)")
+        axis.set_xticklabels(["0", "1", "2", "4", "8", "16", "32", "64"])
         plt.savefig(f"strong.png")
-
-    print(dataframe)
-            
 
 
 if __name__ == "__main__":
@@ -238,6 +255,7 @@ if __name__ == "__main__":
                             help="A dry run will not launch jobs")
 
     run_type_parser = run_parser.add_subparsers(dest="test_type")
+
     strong_parser = run_type_parser.add_parser("strong",
                             help="Run tests for strong scaling")
     strong_parser.add_argument("input_size", type=int)
@@ -246,8 +264,6 @@ if __name__ == "__main__":
                             help="Run tests for weak scaling")
     weak_parser.add_argument("num_tests", type=int, help="Number of tests to run")
     
-
-
     
     report_parser = subcommand_parser.add_parser("report", 
                                                  help="Produce report from test results")
