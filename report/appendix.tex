@@ -1,0 +1,234 @@
+\titlespacing\chapter{0pt}{0pt}{0pt}
+\titleformat{\chapter}[display]{\bfseries}{\huge\appendixname~\thechapter}{2ex}{\LARGE}
+
+\begin{appendices}
+
+\chapter{Running the Program (Deprecated)}
+
+\begin{lstlisting}[language=bash, caption=Usage Instructions, captionpos=b]
+svn co https://source.eait.uq.edu.au/svn/cosc3500-s4261833/trunk/MS1
+cd MS1
+make
+./bin/lcs test_input.txt test_output.txt
+\end{lstlisting}
+
+\chapter{Running the Performance Tests (Deprecated)}
+\begin{lstlisting}[language=bash, caption=Usage Instructions, captionpos=b]
+svn co https://source.eait.uq.edu.au/svn/cosc3500-s4261833/trunk/MS1
+cd MS1
+make
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+python -m testing <num_tests> <max_length>
+\end{lstlisting}
+
+\chapter{Slurm Script}
+\begin{lstlisting}[language=bash, caption=Slurm Script (go.sh), captionpos=b]
+#!/bin/bash
+#SBATCH −−partition=coursework
+#SBATCH −−job−name=:sad_parrot:
+#SBATCH −−nodes=1
+#SBATCH −−ntasks=4
+#SBATCH −−ntasks−per−node=4
+#SBATCH −−cpus−per−task=4
+
+export OMP_NUM_THREADS=4
+export SLURM_TASKS_PER_NODE=4
+export SLURM_NPROCS=4
+
+DATE=$(date +"%Y%m%d%H%M")
+echo "time started "$DATE
+echo "This is job ’$SLURM_JOB_NAME’ (id: $SLURM_JOB_ID) running on the following nodes:"
+echo $SLURM_NODELIST
+echo "running with OMP_NUM_THREADS= $OMP_NUM_THREADS "
+echo "running with SLURM_TASKS_PER_NODE= $SLURM_TASKS_PER_NODE "
+echo "running with SLURM_NPROCS= $SLURM_NPROCS "
+echo "Now we start the show:"
+export TIMEFORMAT="%E sec"
+
+module load mpi/openmpi-x86_64
+time mpirun -n ${SLURM_NPROCS} ./bin/lcs-hybrid test_input.txt test_output.txt
+
+DATE=$(date +"%Y%m%d%H%M")
+echo "time finished "$DATE
+# echo "we just ran with the following SLURM environment variables" # env | grep SLURM
+\end{lstlisting}
+
+
+\chapter{Testing Framework Operation}
+\label{app:framework}
+\begin{lstlisting}[language=bash, caption=Testing Framework Operation, captionpos=b]
+svn co https://source.eait.uq.edu.au/svn/cosc3500-s4261833/trunk/MS3
+
+make
+
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+python -m testing run strong 10000 20
+# Wait for the resulting slurm jobs to finish
+mv ./tests ./tests-strong
+python -m testing report strong ./tests-strong
+
+python -m testing run weak 20
+# Wait for the resulting slurm jobs to finish
+mv ./tests ./tests-weak
+python -m testing report weak ./tests-weak
+\end{lstlisting}
+
+
+\chapter{Slurm Template}
+\label{app:template}
+\begin{lstlisting}[language=bash, caption=Slurm Template (template.sh), captionpos=b]
+#!/bin/bash
+#SBATCH --partition=coursework
+#SBATCH --job-name={{name}}
+#SBATCH --nodes={{nnodes}}
+#SBATCH --ntasks={{ntasks}}
+#SBATCH --ntasks-per-node={{ntasks_per_node}}
+#SBATCH --cpus-per-task={{cpus_per_task}}
+#SBATCH --time=1:00:00
+
+export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK}
+export TIMEFORMAT="%E sec"
+
+echo "{{name}} - {{input}}"
+
+module load mpi/openmpi-x86_64
+time mpirun -n ${SLURM_NPROCS} {{binary}} {{input}} {{output}}
+
+DATE=$(date +"%Y%m%d%H%M")
+echo "time finished "$DATE
+\end{lstlisting}
+
+\chapter{Actual Strong Testing Configuration}
+\label{app:actual-strong}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|l|l|l|}
+\hline
+\multicolumn{1}{|c|}{\textbf{Nodes}} & \multicolumn{1}{c|}{\textbf{Tasks}} & \multicolumn{1}{c|}{\textbf{Tasks/Node}} & \multicolumn{1}{c|}{\textbf{CPUs/Task}} \\ \hline
+1 & 1 & 1 & 1 \\ \hline
+1 & 1 & 1 & 2 \\ \hline
+1 & 1 & 1 & 4 \\ \hline
+1 & 1 & 1 & 8 \\ \hline
+1 & 1 & 1 & 16 \\ \hline
+1 & 2 & 2 & 1 \\ \hline
+1 & 2 & 2 & 2 \\ \hline
+1 & 2 & 2 & 4 \\ \hline
+1 & 2 & 2 & 8 \\ \hline
+1 & 4 & 4 & 1 \\ \hline
+1 & 4 & 4 & 2 \\ \hline
+1 & 4 & 4 & 4 \\ \hline
+1 & 8 & 8 & 1 \\ \hline
+1 & 8 & 8 & 2 \\ \hline
+1 & 16 & 16 & 1 \\ \hline
+2 & 2 & 1 & 1 \\ \hline
+2 & 2 & 1 & 2 \\ \hline
+2 & 2 & 1 & 4 \\ \hline
+2 & 2 & 1 & 8 \\ \hline
+2 & 4 & 2 & 1 \\ \hline
+2 & 4 & 2 & 2 \\ \hline
+2 & 4 & 2 & 4 \\ \hline
+2 & 8 & 4 & 1 \\ \hline
+2 & 8 & 4 & 2 \\ \hline
+2 & 16 & 8 & 1 \\ \hline
+2 & 32 & 16 & 1 \\ \hline
+4 & 4 & 1 & 1 \\ \hline
+4 & 4 & 1 & 2 \\ \hline
+4 & 4 & 1 & 4 \\ \hline
+4 & 8 & 2 & 1 \\ \hline
+4 & 8 & 2 & 2 \\ \hline
+4 & 16 & 4 & 1 \\ \hline
+4 & 32 & 8 & 1 \\ \hline
+4 & 64 & 16 & 1 \\ \hline
+\end{tabular}
+\caption{Strong Scaling Test Configuration}
+\label{tab:strong-config}
+\end{table}
+
+\chapter{Full Strong Scaling Results}
+\label{app:strong-res}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|l|l|l|l|l|l|l|l|l|}
+\hline
+\multicolumn{1}{|c|}{\textbf{Nodes}} & \multicolumn{1}{c|}{\textbf{Tasks}} & \multicolumn{1}{c|}{\textbf{\begin{tabular}[c]{@{}c@{}}Tasks/\\ Node\end{tabular}}} & \multicolumn{1}{c|}{\textbf{\begin{tabular}[c]{@{}c@{}}CPUs/\\ Task\end{tabular}}} & \multicolumn{1}{c|}{\textbf{\begin{tabular}[c]{@{}c@{}}Problem\\ Size\end{tabular}}} & \multicolumn{1}{c|}{\textbf{\begin{tabular}[c]{@{}c@{}}Problem\\ Size/\\ Task\end{tabular}}} & \multicolumn{1}{c|}{\textbf{\begin{tabular}[c]{@{}c@{}}Run\\ Time\end{tabular}}} & \multicolumn{1}{c|}{\textbf{\begin{tabular}[c]{@{}c@{}}Processing\\ Units\end{tabular}}} & \multicolumn{1}{c|}{\textbf{\begin{tabular}[c]{@{}c@{}}Theoretical\\ Speedup\end{tabular}}} & \multicolumn{1}{c|}{\textbf{\begin{tabular}[c]{@{}c@{}}Actual\\ Speedup\end{tabular}}} \\ \hline
+1 & 1 & 1 & 1 & 10000 & 10000 & 226.8824 & 1 & 1.00 & 1.00 \\ \hline
+1 & 1 & 1 & 2 & 10000 & 10000 & 185.8092 & 2 & 1.90 & 1.22 \\ \hline
+1 & 1 & 1 & 4 & 10000 & 10000 & 150.6327 & 4 & 3.48 & 1.51 \\ \hline
+1 & 1 & 1 & 8 & 10000 & 10000 & 133.09 & 8 & 5.93 & 1.70 \\ \hline
+1 & 1 & 1 & 16 & 10000 & 10000 & 142.4498 & 16 & 9.14 & 1.59 \\ \hline
+1 & 2 & 2 & 1 & 10000 & 5000 & 228.7812 & 2 & 1.90 & 0.99 \\ \hline
+1 & 2 & 2 & 2 & 10000 & 5000 & 178.9482 & 4 & 3.48 & 1.27 \\ \hline
+1 & 2 & 2 & 4 & 10000 & 5000 & 148.2034 & 8 & 5.93 & 1.53 \\ \hline
+1 & 2 & 2 & 8 & 10000 & 5000 & 146.5848 & 16 & 9.14 & 1.55 \\ \hline
+1 & 4 & 4 & 1 & 10000 & 2500 & 84.7677 & 4 & 3.48 & 2.68 \\ \hline
+1 & 4 & 4 & 2 & 10000 & 2500 & 77.944 & 8 & 5.93 & 2.91 \\ \hline
+1 & 4 & 4 & 4 & 10000 & 2500 & 82.579 & 16 & 9.14 & 2.75 \\ \hline
+1 & 8 & 8 & 1 & 10000 & 1250 & 36.5175 & 8 & 5.93 & 6.21 \\ \hline
+1 & 8 & 8 & 2 & 10000 & 1250 & 60.5753 & 16 & 9.14 & 3.75 \\ \hline
+1 & 16 & 16 & 1 & 10000 & 625 & 18.1023 & 16 & 9.14 & 12.53 \\ \hline
+2 & 2 & 1 & 1 & 10000 & 5000 & 231.4666 & 2 & 1.90 & 0.98 \\ \hline
+2 & 2 & 1 & 2 & 10000 & 5000 & 182.3175 & 4 & 3.48 & 1.24 \\ \hline
+2 & 2 & 1 & 4 & 10000 & 5000 & 147.9168 & 8 & 5.93 & 1.53 \\ \hline
+2 & 2 & 1 & 8 & 10000 & 5000 & 140.4557 & 16 & 9.14 & 1.62 \\ \hline
+2 & 4 & 2 & 1 & 10000 & 2500 & 85.2426 & 4 & 3.48 & 2.66 \\ \hline
+2 & 4 & 2 & 2 & 10000 & 2500 & 78.4404 & 8 & 5.93 & 2.89 \\ \hline
+2 & 4 & 2 & 4 & 10000 & 2500 & 83.6625 & 16 & 9.14 & 2.71 \\ \hline
+2 & 8 & 4 & 1 & 10000 & 1250 & 37.9601 & 8 & 5.93 & 5.98 \\ \hline
+2 & 8 & 4 & 2 & 10000 & 1250 & 35.2048 & 16 & 9.14 & 6.44 \\ \hline
+2 & 16 & 8 & 1 & 10000 & 625 & 18.3757 & 16 & 9.14 & 12.35 \\ \hline
+2 & 32 & 16 & 1 & 10000 & 312 & 10.2094 & 32 & 12.55 & 22.22 \\ \hline
+4 & 4 & 1 & 1 & 10000 & 2500 & 85.1312 & 4 & 3.48 & 2.67 \\ \hline
+4 & 4 & 1 & 2 & 10000 & 2500 & 74.9924 & 8 & 5.93 & 3.03 \\ \hline
+4 & 4 & 1 & 4 & 10000 & 2500 & 72.5175 & 16 & 9.14 & 3.13 \\ \hline
+4 & 8 & 2 & 1 & 10000 & 1250 & 37.2422 & 8 & 5.93 & 6.09 \\ \hline
+4 & 8 & 2 & 2 & 10000 & 1250 & 35.1404 & 16 & 9.14 & 6.46 \\ \hline
+4 & 16 & 4 & 1 & 10000 & 625 & 18.0858 & 16 & 9.14 & 12.54 \\ \hline
+4 & 32 & 8 & 1 & 10000 & 312 & 10.0879 & 32 & 12.55 & 22.49 \\ \hline
+4 & 64 & 16 & 1 & 10000 & 156 & 6.9848 & 64 & 15.42 & 32.48 \\ \hline
+\end{tabular}
+\caption{Full Strong Scaling Results (getafix, n=20)}
+\label{tab:strong-results}
+\end{table}
+
+\chapter{Weak Scaling Results}
+\label{app:weak-res}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|l|l|l|l|l|l|l|l|l|}
+\hline
+\multicolumn{1}{|c|}{\textbf{Nodes}} & \multicolumn{1}{c|}{\textbf{Tasks}} & \multicolumn{1}{c|}{\textbf{\begin{tabular}[c]{@{}c@{}}Tasks/\\ Node\end{tabular}}} & \multicolumn{1}{c|}{\textbf{\begin{tabular}[c]{@{}c@{}}CPUs/\\ Task\end{tabular}}} & \multicolumn{1}{c|}{\textbf{\begin{tabular}[c]{@{}c@{}}Problem\\ Size\end{tabular}}} & \multicolumn{1}{c|}{\textbf{\begin{tabular}[c]{@{}c@{}}Problem\\ Size/Task\end{tabular}}} & \multicolumn{1}{c|}{\textbf{\begin{tabular}[c]{@{}c@{}}Run\\ Time\end{tabular}}} & \multicolumn{1}{c|}{\textbf{\begin{tabular}[c]{@{}c@{}}Processing\\ Units\end{tabular}}} & \multicolumn{1}{c|}{\textbf{\begin{tabular}[c]{@{}c@{}}Theoretical\\ Speedup\end{tabular}}} & \multicolumn{1}{c|}{\textbf{\begin{tabular}[c]{@{}c@{}}Actual\\ Speedup\end{tabular}}} \\ \hline
+1 & 1 & 1 & 1 & 10 & 10 & 0.434 & 1 & 1 & 1.00 \\ \hline
+1 & 2 & 2 & 1 & 20 & 10 & 0.465 & 2 & 1.95 & 1.86 \\ \hline
+1 & 4 & 4 & 1 & 40 & 10 & 0.414 & 4 & 3.85 & 4.19 \\ \hline
+1 & 8 & 8 & 1 & 80 & 10 & 0.395 & 8 & 7.65 & 8.78 \\ \hline
+1 & 16 & 16 & 1 & 160 & 10 & 0.518 & 16 & 15.25 & 13.40 \\ \hline
+2 & 32 & 16 & 1 & 320 & 10 & 0.877 & 32 & 30.45 & 15.83 \\ \hline
+4 & 64 & 16 & 1 & 640 & 10 & 0.787 & 64 & 60.85 & 35.25 \\ \hline
+1 & 1 & 1 & 1 & 100 & 100 & 0.462 & 1 & 1 & 1.00 \\ \hline
+1 & 2 & 2 & 1 & 200 & 100 & 0.749 & 2 & 1.95 & 1.23 \\ \hline
+1 & 4 & 4 & 1 & 400 & 100 & 0.551 & 4 & 3.85 & 3.36 \\ \hline
+1 & 8 & 8 & 1 & 800 & 100 & 0.700 & 8 & 7.65 & 5.28 \\ \hline
+1 & 16 & 16 & 1 & 1600 & 100 & 1.119 & 16 & 15.25 & 6.61 \\ \hline
+2 & 32 & 16 & 1 & 3200 & 100 & 2.114 & 32 & 30.45 & 6.99 \\ \hline
+4 & 64 & 16 & 1 & 6400 & 100 & 3.644 & 64 & 60.85 & 8.11 \\ \hline
+1 & 1 & 1 & 1 & 1000 & 1000 & 8.036 & 1 & 1 & 1.00 \\ \hline
+1 & 2 & 2 & 1 & 2000 & 1000 & 24.439 & 2 & 1.95 & 0.66 \\ \hline
+1 & 4 & 4 & 1 & 4000 & 1000 & 17.651 & 4 & 3.85 & 1.82 \\ \hline
+1 & 8 & 8 & 1 & 8000 & 1000 & 33.397 & 8 & 7.65 & 1.92 \\ \hline
+1 & 16 & 16 & 1 & 16000 & 1000 & 66.100 & 16 & 15.25 & 1.95 \\ \hline
+2 & 32 & 16 & 1 & 32000 & 1000 & 136.411 & 32 & 30.45 & 1.89 \\ \hline
+4 & 64 & 16 & 1 & 64000 & 1000 & 292.969 & 64 & 60.85 & 1.76 \\ \hline
+\end{tabular}
+\caption{Full Weak Scaling Results}
+\label{tab:weak-results}
+\end{table}
+
+\end{appendices}
