@@ -1,4 +1,5 @@
-# High Performance Computing (COSC3500) at The University of Queensland
+# High Performance Computing (COSC3500) 
+## at The University of Queensland
 
 This repository contains the coursework and assessment completed while studying HPC at UQ.
 
