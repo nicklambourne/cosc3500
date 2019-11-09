@@ -132,14 +132,15 @@ def produce_weak_jobs() -> List[Job]:
 
     for increment in increments:
         for ntasks in b2_options(MAX_TASKS):
-            length = increment * ntasks
-            write_weak_file(test_string_a, test_string_b, length)
             nnodes = ceil(ntasks / MAX_TASKS_PER_NODE)
             ntasks_per_node = ntasks if ntasks <= MAX_TASKS_PER_NODE else int(ntasks / nnodes)
-            cpus_per_task = 1
-            job = Job(nnodes, ntasks, ntasks_per_node, cpus_per_task, 
-                      f"{INPUT_ROOT}/{length}.in", f"{INPUT_ROOT}/{length}.out")
-            jobs.append(job)
+            for cpus_per_task in [1, 2, 4, 8, 16]: 
+                if ntasks_per_node * cpus_per_task <= MAX_CORES_PER_NODE:
+                    length = increment * ntasks * cpus_per_task
+                    write_weak_file(test_string_a, test_string_b, length)
+                    job = Job(nnodes, ntasks, ntasks_per_node, cpus_per_task, 
+                              f"{INPUT_ROOT}/{length}.in", f"{INPUT_ROOT}/{length}.out")
+                    jobs.append(job)
     
     return jobs
 
@@ -188,7 +189,7 @@ def run_report(args: Namespace) -> None:
                 run_time = float(result_file.readline().split(" ")[0])
 
                 findings.append([nnodes, ntasks, ntasks_per_node, cpus_per_task,
-                                 problem_size, int(problem_size/ntasks), run_time])
+                                 problem_size, int(problem_size/(ntasks)), run_time])
 
             except:
                 pass
@@ -222,7 +223,7 @@ def run_report(args: Namespace) -> None:
             axis = group.plot(kind="line", x="ntasks", y="run_time", label=key, linestyle="-", marker="o")
             plt.legend(title="Size/Processing Unit", loc="best")
             axis.set_ylabel("Wall Time (s)")
-            axis.set_xlabel("MPI Process Count (ntasks)")
+            axis.set_xlabel("Processing Units (ntasks * cpus_per_task)")
             plt.savefig(f"weak-{magnitude}.png")
         dataframe.to_csv(f"{args.test_type}.csv")
         print(dataframe)
